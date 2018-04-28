@@ -136,7 +136,7 @@
 									implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
 									<manifestEntries>
 										<Main-Class>io.vertx.core.Launcher</Main-Class>
-										<Main-Verticle>top.onceio.vertdeomo.MainVerticle</Main-Verticle>
+										<Main-Verticle>top.onceio.plugins.vertx.OnceIOVerticle</Main-Verticle>
 									</manifestEntries>
 								</transformer>
 								<transformer
@@ -167,7 +167,7 @@
 					<mainClass>io.vertx.core.Launcher</mainClass>
 					<arguments>
 						<argument>run</argument>
-						<argument>top.onceio.vertdeomo.MainVerticle</argument>
+						<argument>top.onceio.plugins.vertx.OnceIOVerticle</argument>
 					</arguments>
 				</configuration>
 			</plugin>
