@@ -7,9 +7,6 @@ import java.net.URLDecoder;
 import java.util.Map;
 import java.util.function.BiConsumer;
 
-import com.google.gson.JsonIOException;
-import com.google.gson.JsonSyntaxException;
-
 import io.vertx.core.Handler;
 import io.vertx.core.MultiMap;
 import io.vertx.core.buffer.Buffer;
@@ -59,15 +56,7 @@ public class ApiPairAdaptor {
 				Method method = apiPair.getMethod();
 				Map<Integer, String> paramNameArgIndex = apiPair.getParamNameArgIndex();
 				Map<Integer, String> attrNameArgIndex = apiPair.getAttrNameArgIndex();
-				JsonObject json = null;
-				try {
-					byte[] bytes = event.getBytes();
-					if(bytes != null && bytes.length > 0) {
-						json = event.toJsonObject();
-					}
-				} catch (JsonSyntaxException | JsonIOException  e) {
-					e.printStackTrace();
-				}
+				JsonObject json = event.toJsonObject();
 				if (json == null) {
 					json = new JsonObject();
 				}
