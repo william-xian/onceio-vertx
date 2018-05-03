@@ -3,7 +3,10 @@ package top.onceio.plugins.vertx;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Type;
+import java.math.BigDecimal;
 import java.net.URLDecoder;
+import java.sql.Date;
 import java.util.Map;
 import java.util.function.BiConsumer;
 
@@ -15,7 +18,12 @@ import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import top.onceio.core.beans.ApiPair;
-import top.onceio.core.util.OUtils;
+import top.onceio.core.db.dao.Cnd;
+import top.onceio.core.db.dao.DaoHolder;
+import top.onceio.core.db.dao.tpl.SelectTpl;
+import top.onceio.core.db.dao.tpl.UpdateTpl;
+import top.onceio.core.util.OLog;
+import top.onceio.core.util.OReflectUtil;
 
 public class ApiPairAdaptor {
 	private ApiPair apiPair;
@@ -46,106 +54,159 @@ public class ApiPairAdaptor {
 		return jobj;
 	}
 
+	private Object[] resoveArgs(final HttpServerRequest req,final Buffer event) {
+		Map<String,Integer> nameVarIndex = apiPair.getNameVarIndex();
+		Map<Class<?>,Integer> typeIndex = apiPair.getTypeIndex();
+		Method method = apiPair.getMethod();
+		Map<Integer, String> paramNameArgIndex = apiPair.getParamNameArgIndex();
+		Map<Integer, String> attrNameArgIndex = apiPair.getAttrNameArgIndex();
+		JsonObject json = null;
+		if (event.length() > 0) {
+			json = event.toJsonObject();
+		}
+		if (json == null) {
+			json = new JsonObject();
+		}
+		String uri = req.path();
+		try {
+			uri = URLDecoder.decode(uri, "UTF-8");
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
+		String[] uris = uri.split("/");
+		for (String name : nameVarIndex.keySet()) {
+			Integer i = nameVarIndex.get(name);
+			String v = uris[i];
+			json.put(name, v);
+		}
+		MultiMap map = req.params();
+		for (Map.Entry<String, String> entry : map.entries()) {
+			String val = entry.getValue();
+			String name = entry.getKey();
+			String[] ps = name.split("\\.");
+			String pname = name;
+			JsonObject jobj = json;
+			if (ps.length > 0) {
+				pname = ps[ps.length - 1];
+				jobj = getOrCreateFatherByPath(json, ps);
+			}
+
+			Object jval = jobj.getValue(pname);
+			if(jval == null) {
+				jobj.put(pname, val);
+			} else {
+				if(jval instanceof JsonArray) {
+					((JsonArray)jval).add(val);
+				} else {
+					JsonArray ja = new JsonArray();
+					ja.add(jval);
+					ja.add(val);
+					jobj.put(pname, ja);
+				}
+			}
+		}
+		Object[] args = new Object[method.getParameterCount()];
+		Class<?>[] types = apiPair.getMethod().getParameterTypes();
+		
+		if (paramNameArgIndex != null && !paramNameArgIndex.isEmpty()) {
+			for (Map.Entry<Integer, String> entry : paramNameArgIndex.entrySet()) {
+				Class<?> type = types[entry.getKey()];
+				if (entry.getValue().equals("")) {
+					args[entry.getKey()] = json.mapTo(type);
+				} else {
+					if(DaoHolder.class.isAssignableFrom(apiPair.getBean().getClass())) {
+						Type t = DaoHolder.class.getTypeParameters()[0];
+						Class<?> tblClass = OReflectUtil.searchGenType(DaoHolder.class, apiPair.getBean().getClass(), t);
+						String argStr = json.getString(entry.getValue());
+						if(type.isAssignableFrom(Cnd.class) && args[entry.getKey()] == null) {
+							args[entry.getKey()] = new Cnd<>(tblClass,argStr);
+						} else if(type.isAssignableFrom(SelectTpl.class) && args[entry.getKey()] == null) {
+							args[entry.getKey()] = new SelectTpl<>(tblClass,argStr);
+						}else if(type.isAssignableFrom(UpdateTpl.class) && args[entry.getKey()] == null) {
+							args[entry.getKey()] = new UpdateTpl<>(tblClass,argStr);
+						}else {
+							args[entry.getKey()] = trans(json,entry.getValue(),type);
+						}
+					} else {
+						args[entry.getKey()] = trans(json,entry.getValue(),type);
+					}
+				}
+			}
+		}
+		if (attrNameArgIndex != null && !attrNameArgIndex.isEmpty()) {
+			for (Map.Entry<Integer, String> entry : attrNameArgIndex.entrySet()) {
+				args[entry.getKey()] = req.getFormAttribute(entry.getValue());
+			}
+		}
+		if (typeIndex != null && !typeIndex.isEmpty()) {
+			typeIndex.forEach(new BiConsumer<Class<?>,Integer>() {
+				@Override
+				public void accept(Class<?> cls, Integer i) {
+					if(HttpServerRequest.class.isAssignableFrom(cls)){
+						args[i] = req;
+					}
+				}
+			});
+		}
+		return args;
+	}
+	
+	private  Object trans(JsonObject obj, String key,Class<?> type) {
+		if(obj != null) {
+			if (type.equals(String.class)) {
+				return obj.getString(key);
+			} else if (type.equals(int.class) || type.equals(Integer.class)) {
+				return obj.getInteger(key);
+			} else if (type.equals(long.class) || type.equals(Long.class)) {
+				return obj.getLong(key);
+			} else if (type.equals(boolean.class) || type.equals(Boolean.class)) {
+				return obj.getBoolean(key);
+			} else if (type.equals(byte.class) || type.equals(Byte.class)) {
+				return obj.getBinary(key)[0];
+			} else if (type.equals(short.class) || type.equals(Short.class)) {
+				return obj.getInteger(key);
+			} else if (type.equals(double.class) || type.equals(Double.class)) {
+				return obj.getDouble(key);
+			} else if (type.equals(float.class) || type.equals(Float.class)) {
+				return obj.getFloat(key);
+			} else if (type.equals(BigDecimal.class)) {
+				return new BigDecimal(obj.getString(key));
+			} else if (type.equals(Date.class)) {
+				return new Date(obj.getLong(key));
+			}else {
+				return obj.getJsonObject(key).mapTo(type);
+			}
+		}
+		return null;
+	}
+	
 	public void invoke(HttpServerRequest req)
 			throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
 		req.bodyHandler(new Handler<Buffer>() {
 			@Override
 			public void handle(Buffer event) {
-				Map<String,Integer> nameVarIndex = apiPair.getNameVarIndex();
-				Map<Class<?>,Integer> typeIndex = apiPair.getTypeIndex();
-				Method method = apiPair.getMethod();
-				Map<Integer, String> paramNameArgIndex = apiPair.getParamNameArgIndex();
-				Map<Integer, String> attrNameArgIndex = apiPair.getAttrNameArgIndex();
-				JsonObject json = event.toJsonObject();
-				if (json == null) {
-					json = new JsonObject();
-				}
-				String uri = req.path();
+				req.response().putHeader("Content-Type", "application/json");
+				Object[] args = resoveArgs(req,event);
+				Object obj = null;
+				String msg = null;
 				try {
-					uri = URLDecoder.decode(uri, "UTF-8");
-				} catch (UnsupportedEncodingException e) {
+					obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
+				} catch (IllegalAccessException |IllegalArgumentException |InvocationTargetException e) {
+					msg = e.getMessage();
 					e.printStackTrace();
 				}
-				String[] uris = uri.split("/");
-				for (String name : nameVarIndex.keySet()) {
-					Integer i = nameVarIndex.get(name);
-					String v = uris[i];
-					json.put(name, v);
-				}
-				MultiMap map = req.params();
-				for (Map.Entry<String, String> entry : map.entries()) {
-					String val = entry.getValue();
-					String name = entry.getKey();
-					String[] ps = name.split("\\.");
-					String pname = name;
-					JsonObject jobj = json;
-					if (ps.length > 0) {
-						pname = ps[ps.length - 1];
-						jobj = getOrCreateFatherByPath(json, ps);
+				if(obj != null){
+					req.response().end(Json.encode(obj));
+				} else {
+					if(msg == null) {
+						msg = "ERROR";
 					}
-
-					Object jval = jobj.getValue(pname);
-					if(jval == null) {
-						jobj.put(pname, val);
-					} else {
-						if(jval instanceof JsonArray) {
-							((JsonArray)jval).add(val);
-						} else {
-							JsonArray ja = new JsonArray();
-							ja.add(jval);
-							ja.add(val);
-							jobj.put(pname, ja);
-						}
-					}
-				}
-				Object[] args = new Object[method.getParameterCount()];
-				Class<?>[] types = apiPair.getMethod().getParameterTypes();
-				
-				if (paramNameArgIndex != null && !paramNameArgIndex.isEmpty()) {
-					for (Map.Entry<Integer, String> entry : paramNameArgIndex.entrySet()) {
-						Class<?> type = types[entry.getKey()];
-						if (entry.getValue().equals("")) {
-							args[entry.getKey()] = json.mapTo(type);
-						} else {
-							args[entry.getKey()] =  OUtils.createFromJson(json.getValue(entry.getValue()).toString(), type);
-						}
-					}
-				}
-				if (paramNameArgIndex != null && !paramNameArgIndex.isEmpty()) {
-					for (Map.Entry<Integer, String> entry : paramNameArgIndex.entrySet()) {
-						Class<?> type = types[entry.getKey()];
-						if (entry.getValue().equals("")) {
-							args[entry.getKey()] = json.mapTo(type);
-						} else {
-							args[entry.getKey()] =  OUtils.createFromJson(json.getValue(entry.getValue()).toString(), type);
-						}
-					}
-				}
-				if (attrNameArgIndex != null && !attrNameArgIndex.isEmpty()) {
-					for (Map.Entry<Integer, String> entry : attrNameArgIndex.entrySet()) {
-						args[entry.getKey()] = req.getFormAttribute(entry.getValue());
-					}
-				}
-				if (typeIndex != null && !typeIndex.isEmpty()) {
-					typeIndex.forEach(new BiConsumer<Class<?>,Integer>() {
-						@Override
-						public void accept(Class<?> cls, Integer i) {
-							if(HttpServerRequest.class.isAssignableFrom(cls)){
-								args[i] = req;
-							}
-						}
-					});
-				}
-				req.response().putHeader("Content-Type", "application/json");
-				try {
-					Object obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
-					if(!req.response().ended()){
-						req.response().end(Json.encode(obj));
-					}
-				} catch (IllegalAccessException |IllegalArgumentException |InvocationTargetException e) {
-					req.response().end(e.getMessage());
+					req.response().end(msg);
 				}
 			}
+		});
+		req.exceptionHandler(handler -> {
+			OLog.error(handler.getMessage());
 		});
 
 	}

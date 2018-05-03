@@ -1,10 +1,17 @@
 package top.onceio.plugins.vertx;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.Map;
+import java.util.function.BiConsumer;
 
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Handler;
+import io.vertx.core.http.HttpMethod;
+import io.vertx.core.http.HttpServer;
+import io.vertx.ext.web.Router;
+import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.impl.RouterImpl;
 import top.onceio.core.annotation.BeansIn;
-import top.onceio.core.beans.ApiMethod;
 import top.onceio.core.beans.ApiPair;
 import top.onceio.core.beans.ApiResover;
 import top.onceio.core.beans.BeansEden;
@@ -23,37 +30,48 @@ public class OIOVerticle extends AbstractVerticle {
     		pkgs = new String[]{pkg.substring(0, pkg.lastIndexOf('.'))};
     	}
     	BeansEden.get().resovle(pkgs);
-        vertx.createHttpServer().requestHandler(req -> {
-    		String localUri = req.path();
-			ApiPair apiPair = search(ApiMethod.valueOf(req.method().toString()),localUri);
-    		if(apiPair != null) {
-    			ApiPairAdaptor adaptor = new ApiPairAdaptor(apiPair);
-    			try {
-					adaptor.invoke(req);
-				} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-					req.response().end(e.getMessage());
+    	HttpServer server = vertx.createHttpServer();
+    	Router router = new RouterImpl(vertx);
+        ApiResover ar = BeansEden.get().getApiResover();
+        Map<String, ApiPair> p2ap = ar.getPatternToApi();  
+        p2ap.forEach(new BiConsumer<String,ApiPair>(){
+			@Override
+			public void accept(String key, ApiPair apiPair) {
+				int sp = key.indexOf(':');
+				String method = key.substring(0, sp);
+				String uri = key.substring(sp+1);
+				HttpMethod httpMethod = null;
+				try {
+					if(method.equals("REMOVE")||method.equals("RECOVERY")){
+						method = "GET";
+					}
+					httpMethod = HttpMethod.valueOf(method);
+				}catch( Exception e) {
 				}
-    		} else {
-    			req.response().end("Can't find :" + localUri);
-    		}
-    		}).listen(port);
-    }
-    
-    /**
-     * TODO O3
-     * @param apiMethod
-     * @param uri
-     * @return
-     */
-    
-	public ApiPair search(ApiMethod apiMethod, String uri) {
-		ApiResover ar = BeansEden.get().getApiResover();
-		String target = apiMethod.name() + ":" + uri;
-		for(String api:ar.getApis()) {
-			if (target.matches(api)) {
-				return ar.getPatternToApi().get(api);
+				Handler<RoutingContext> handler = (event -> {
+					ApiPairAdaptor adaptor = new ApiPairAdaptor(apiPair);
+					try {
+						adaptor.invoke(event.request());
+					} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+						event.request().response().end(e.getMessage());
+					}
+				});
+				if(uri.contains("[^/]+")) {
+					if(httpMethod != null) {
+						router.routeWithRegex(httpMethod,uri).handler(handler);	
+					} else {
+						router.routeWithRegex(uri).handler(handler);	
+					}
+				}else {
+					if(httpMethod != null) {
+						router.route(httpMethod,uri).handler(handler);	
+					} else {
+						router.route(uri).handler(handler);	
+					}
+				}
 			}
-		}
-		return null;
-	}
+        });
+        
+        server.requestHandler(router::accept).listen(port);
+    }
 }
