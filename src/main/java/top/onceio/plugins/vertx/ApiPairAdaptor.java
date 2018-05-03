@@ -17,6 +17,7 @@ import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.RoutingContext;
 import top.onceio.core.beans.ApiPair;
 import top.onceio.core.db.dao.Cnd;
 import top.onceio.core.db.dao.DaoHolder;
@@ -56,7 +57,7 @@ public class ApiPairAdaptor {
 		return jobj;
 	}
 
-	private Object[] resoveArgs(final HttpServerRequest req, final Buffer event) {
+	private Object[] resoveArgs(final RoutingContext event) {
 		Map<String, Integer> nameVarIndex = apiPair.getNameVarIndex();
 		Map<Class<?>, Integer> typeIndex = apiPair.getTypeIndex();
 		Method method = apiPair.getMethod();
@@ -66,8 +67,11 @@ public class ApiPairAdaptor {
 			typeIndex.forEach(new BiConsumer<Class<?>, Integer>() {
 				@Override
 				public void accept(Class<?> cls, Integer i) {
-					if (HttpServerRequest.class.isAssignableFrom(cls)) {
-						args[i] = req;
+					if (RoutingContext.class.isAssignableFrom(cls)) {
+						args[i] = event;
+						signal.append(true);
+					} else if (HttpServerRequest.class.isAssignableFrom(cls)) {
+						args[i] = event.request();
 						signal.append(true);
 					}
 				}
@@ -81,13 +85,11 @@ public class ApiPairAdaptor {
 		Map<Integer, String> paramNameArgIndex = apiPair.getParamNameArgIndex();
 		Map<Integer, String> attrNameArgIndex = apiPair.getAttrNameArgIndex();
 		JsonObject json = null;
-		if (event.length() > 0) {
-			json = event.toJsonObject();
-		}
+		json = event.getBodyAsJson();
 		if (json == null) {
 			json = new JsonObject();
 		}
-		String uri = req.path();
+		String uri = event.normalisedPath();
 		try {
 			uri = URLDecoder.decode(uri, "UTF-8");
 		} catch (UnsupportedEncodingException e) {
@@ -99,7 +101,7 @@ public class ApiPairAdaptor {
 			String v = uris[i];
 			json.put(name, v);
 		}
-		MultiMap map = req.params();
+		MultiMap map = event.queryParams();
 		for (Map.Entry<String, String> entry : map.entries()) {
 			String val = entry.getValue();
 			String name = entry.getKey();
@@ -155,7 +157,7 @@ public class ApiPairAdaptor {
 		}
 		if (attrNameArgIndex != null && !attrNameArgIndex.isEmpty()) {
 			for (Map.Entry<Integer, String> entry : attrNameArgIndex.entrySet()) {
-				args[entry.getKey()] = req.getFormAttribute(entry.getValue());
+				args[entry.getKey()] = event.getCookie(entry.getValue());
 			}
 		}
 		return args;
@@ -190,13 +192,14 @@ public class ApiPairAdaptor {
 		return null;
 	}
 
-	public void invoke(HttpServerRequest req)
+	public void invoke(RoutingContext event)
 			throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
+		HttpServerRequest req = event.request();
+		Object[] args = resoveArgs(event);
 		req.bodyHandler(new Handler<Buffer>() {
 			@Override
 			public void handle(Buffer event) {
 				req.response().putHeader("Content-Type", "application/json");
-				Object[] args = resoveArgs(req, event);
 				Object obj = null;
 				String msg = null;
 				try {
