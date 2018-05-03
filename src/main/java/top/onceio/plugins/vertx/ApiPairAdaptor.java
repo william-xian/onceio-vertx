@@ -27,9 +27,11 @@ import top.onceio.core.util.OReflectUtil;
 
 public class ApiPairAdaptor {
 	private ApiPair apiPair;
+
 	public ApiPairAdaptor(ApiPair ap) {
 		this.apiPair = ap;
 	}
+
 	/**
 	 * 根据方法参数及其注解，从req（Attr,Param,Body,Cookie)中取出数据
 	 * 
@@ -37,7 +39,7 @@ public class ApiPairAdaptor {
 	 * @param req
 	 */
 	public void resoveReqParams(HttpServerRequest req) {
-	
+
 	}
 
 	private static JsonObject getOrCreateFatherByPath(JsonObject json, String[] ps) {
@@ -45,7 +47,7 @@ public class ApiPairAdaptor {
 		for (int i = 0; i < ps.length - 1; i++) {
 			String p = ps[i];
 			jobj = jobj.getJsonObject(p);
-			
+
 			if (jobj == null) {
 				jobj = new JsonObject();
 				jobj.put(p, jobj);
@@ -54,10 +56,28 @@ public class ApiPairAdaptor {
 		return jobj;
 	}
 
-	private Object[] resoveArgs(final HttpServerRequest req,final Buffer event) {
-		Map<String,Integer> nameVarIndex = apiPair.getNameVarIndex();
-		Map<Class<?>,Integer> typeIndex = apiPair.getTypeIndex();
+	private Object[] resoveArgs(final HttpServerRequest req, final Buffer event) {
+		Map<String, Integer> nameVarIndex = apiPair.getNameVarIndex();
+		Map<Class<?>, Integer> typeIndex = apiPair.getTypeIndex();
 		Method method = apiPair.getMethod();
+		Object[] args = new Object[method.getParameterCount()];
+		if (typeIndex != null && !typeIndex.isEmpty()) {
+			final StringBuffer signal = new StringBuffer();
+			typeIndex.forEach(new BiConsumer<Class<?>, Integer>() {
+				@Override
+				public void accept(Class<?> cls, Integer i) {
+					if (HttpServerRequest.class.isAssignableFrom(cls)) {
+						args[i] = req;
+						signal.append(true);
+					}
+				}
+			});
+			// TODO 只要有HTTPServerRequest 其他都不生效
+			if (signal.length() > 0) {
+				return args;
+			}
+		}
+
 		Map<Integer, String> paramNameArgIndex = apiPair.getParamNameArgIndex();
 		Map<Integer, String> attrNameArgIndex = apiPair.getAttrNameArgIndex();
 		JsonObject json = null;
@@ -92,11 +112,11 @@ public class ApiPairAdaptor {
 			}
 
 			Object jval = jobj.getValue(pname);
-			if(jval == null) {
+			if (jval == null) {
 				jobj.put(pname, val);
 			} else {
-				if(jval instanceof JsonArray) {
-					((JsonArray)jval).add(val);
+				if (jval instanceof JsonArray) {
+					((JsonArray) jval).add(val);
 				} else {
 					JsonArray ja = new JsonArray();
 					ja.add(jval);
@@ -105,30 +125,30 @@ public class ApiPairAdaptor {
 				}
 			}
 		}
-		Object[] args = new Object[method.getParameterCount()];
 		Class<?>[] types = apiPair.getMethod().getParameterTypes();
-		
+
 		if (paramNameArgIndex != null && !paramNameArgIndex.isEmpty()) {
 			for (Map.Entry<Integer, String> entry : paramNameArgIndex.entrySet()) {
 				Class<?> type = types[entry.getKey()];
 				if (entry.getValue().equals("")) {
 					args[entry.getKey()] = json.mapTo(type);
 				} else {
-					if(DaoHolder.class.isAssignableFrom(apiPair.getBean().getClass())) {
+					if (DaoHolder.class.isAssignableFrom(apiPair.getBean().getClass())) {
 						Type t = DaoHolder.class.getTypeParameters()[0];
-						Class<?> tblClass = OReflectUtil.searchGenType(DaoHolder.class, apiPair.getBean().getClass(), t);
+						Class<?> tblClass = OReflectUtil.searchGenType(DaoHolder.class, apiPair.getBean().getClass(),
+								t);
 						String argStr = json.getString(entry.getValue());
-						if(type.isAssignableFrom(Cnd.class) && args[entry.getKey()] == null) {
-							args[entry.getKey()] = new Cnd<>(tblClass,argStr);
-						} else if(type.isAssignableFrom(SelectTpl.class) && args[entry.getKey()] == null) {
-							args[entry.getKey()] = new SelectTpl<>(tblClass,argStr);
-						}else if(type.isAssignableFrom(UpdateTpl.class) && args[entry.getKey()] == null) {
-							args[entry.getKey()] = new UpdateTpl<>(tblClass,argStr);
-						}else {
-							args[entry.getKey()] = trans(json,entry.getValue(),type);
+						if (type.isAssignableFrom(Cnd.class) && args[entry.getKey()] == null) {
+							args[entry.getKey()] = new Cnd<>(tblClass, argStr);
+						} else if (type.isAssignableFrom(SelectTpl.class) && args[entry.getKey()] == null) {
+							args[entry.getKey()] = new SelectTpl<>(tblClass, argStr);
+						} else if (type.isAssignableFrom(UpdateTpl.class) && args[entry.getKey()] == null) {
+							args[entry.getKey()] = new UpdateTpl<>(tblClass, argStr);
+						} else {
+							args[entry.getKey()] = trans(json, entry.getValue(), type);
 						}
 					} else {
-						args[entry.getKey()] = trans(json,entry.getValue(),type);
+						args[entry.getKey()] = trans(json, entry.getValue(), type);
 					}
 				}
 			}
@@ -138,21 +158,11 @@ public class ApiPairAdaptor {
 				args[entry.getKey()] = req.getFormAttribute(entry.getValue());
 			}
 		}
-		if (typeIndex != null && !typeIndex.isEmpty()) {
-			typeIndex.forEach(new BiConsumer<Class<?>,Integer>() {
-				@Override
-				public void accept(Class<?> cls, Integer i) {
-					if(HttpServerRequest.class.isAssignableFrom(cls)){
-						args[i] = req;
-					}
-				}
-			});
-		}
 		return args;
 	}
-	
-	private  Object trans(JsonObject obj, String key,Class<?> type) {
-		if(obj != null) {
+
+	private Object trans(JsonObject obj, String key, Class<?> type) {
+		if (obj != null) {
 			if (type.equals(String.class)) {
 				return obj.getString(key);
 			} else if (type.equals(int.class) || type.equals(Integer.class)) {
@@ -173,32 +183,32 @@ public class ApiPairAdaptor {
 				return new BigDecimal(obj.getString(key));
 			} else if (type.equals(Date.class)) {
 				return new Date(obj.getLong(key));
-			}else {
+			} else {
 				return obj.getJsonObject(key).mapTo(type);
 			}
 		}
 		return null;
 	}
-	
+
 	public void invoke(HttpServerRequest req)
 			throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
 		req.bodyHandler(new Handler<Buffer>() {
 			@Override
 			public void handle(Buffer event) {
 				req.response().putHeader("Content-Type", "application/json");
-				Object[] args = resoveArgs(req,event);
+				Object[] args = resoveArgs(req, event);
 				Object obj = null;
 				String msg = null;
 				try {
 					obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
-				} catch (IllegalAccessException |IllegalArgumentException |InvocationTargetException e) {
+				} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
 					msg = e.getMessage();
 					e.printStackTrace();
 				}
-				if(obj != null){
+				if (obj != null) {
 					req.response().end(Json.encode(obj));
 				} else {
-					if(msg == null) {
+					if (msg == null) {
 						msg = "ERROR";
 					}
 					req.response().end(msg);
