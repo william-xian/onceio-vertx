@@ -53,9 +53,7 @@ public class OIOVerticle extends AbstractVerticle {
 					try {
 						adaptor.invoke(event);
 					} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-						if (!event.request().isEnded()) {
-							event.request().response().end(e.getMessage());
-						}
+						throw new RuntimeException(e.getMessage());
 					}
 				});
 				if (uri.contains("[^/]+")) {

@@ -202,20 +202,20 @@ public class ApiPairAdaptor {
 				req.response().putHeader("Content-Type", "application/json");
 				Object obj = null;
 				String msg = null;
+				Class<?> returnType = apiPair.getMethod().getReturnType();
 				try {
 					obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
 				} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
 					msg = e.getMessage();
-					e.printStackTrace();
 				}
-				if (obj != null) {
-					req.response().end(Json.encode(obj));
-				} else {
-					if (msg == null) {
-						msg = "ERROR";
-					}
-					req.response().end(msg);
+				if(!returnType.equals(void.class) && !returnType.equals(Void.class)) {
+					if (obj != null) {
+						req.response().end(Json.encode(obj));
+					} else {
+						req.response().end(msg);
+					}	
 				}
+				
 			}
 		});
 		req.exceptionHandler(handler -> {
