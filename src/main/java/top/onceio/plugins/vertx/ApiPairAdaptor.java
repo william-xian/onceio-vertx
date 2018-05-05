@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 import java.net.URLDecoder;
 import java.sql.Date;
 import java.util.Map;
-import java.util.function.BiConsumer;
+import java.util.Map.Entry;
 
 import io.vertx.core.Handler;
 import io.vertx.core.MultiMap;
@@ -33,22 +33,12 @@ public class ApiPairAdaptor {
 		this.apiPair = ap;
 	}
 
-	/**
-	 * 根据方法参数及其注解，从req（Attr,Param,Body,Cookie)中取出数据
-	 * 
-	 * @param result
-	 * @param req
-	 */
-	public void resoveReqParams(HttpServerRequest req) {
-
-	}
 
 	private static JsonObject getOrCreateFatherByPath(JsonObject json, String[] ps) {
 		JsonObject jobj = json;
 		for (int i = 0; i < ps.length - 1; i++) {
 			String p = ps[i];
 			jobj = jobj.getJsonObject(p);
-
 			if (jobj == null) {
 				jobj = new JsonObject();
 				jobj.put(p, jobj);
@@ -56,34 +46,48 @@ public class ApiPairAdaptor {
 		}
 		return jobj;
 	}
-
+	
+	private Object[] detectCallbackableArgs(final RoutingContext event) {
+		Map<Class<?>, Integer> typeIndex = apiPair.getTypeIndex();
+		Method method = apiPair.getMethod();
+		Object[] args = new Object[method.getParameterCount()];
+		if (typeIndex != null && !typeIndex.isEmpty()) {
+			boolean has = false;
+			for(Entry<Class<?>, Integer> entry:typeIndex.entrySet()) {
+				Class<?> cls = entry.getKey();
+				Integer i = entry.getValue();
+				if (RoutingContext.class.isAssignableFrom(cls)) {
+					args[i] = event;
+					has = true;
+				} else if (HttpServerRequest.class.isAssignableFrom(cls)) {
+					args[i] = event.request();
+					has = true;
+				}
+			}
+			if(has) {
+				return args;
+			}
+		}
+		return null;
+	}
+	
+	/**
+	 * 根据方法参数及其注解，从req（Attr,Param,Body,Cookie)中取出数据
+	 * TODO Header
+	 * @param result
+	 * @param req
+	 */
 	private Object[] resoveArgs(final RoutingContext event) {
 		Map<String, Integer> nameVarIndex = apiPair.getNameVarIndex();
 		Map<Class<?>, Integer> typeIndex = apiPair.getTypeIndex();
 		Method method = apiPair.getMethod();
 		Object[] args = new Object[method.getParameterCount()];
-		if (typeIndex != null && !typeIndex.isEmpty()) {
-			final StringBuffer signal = new StringBuffer();
-			typeIndex.forEach(new BiConsumer<Class<?>, Integer>() {
-				@Override
-				public void accept(Class<?> cls, Integer i) {
-					if (RoutingContext.class.isAssignableFrom(cls)) {
-						args[i] = event;
-						signal.append(true);
-					} else if (HttpServerRequest.class.isAssignableFrom(cls)) {
-						args[i] = event.request();
-						signal.append(true);
-					}
-				}
-			});
-			// TODO 只要有HTTPServerRequest 其他都不生效
-			if (signal.length() > 0) {
-				return args;
-			}
-		}
 
 		Map<Integer, String> paramNameArgIndex = apiPair.getParamNameArgIndex();
+		Map<Integer, String> cookieNameArgIndex = apiPair.getCookieNameArgIndex();
+		Map<Integer, String> headerNameArgIndex = apiPair.getHeaderNameArgIndex();
 		Map<Integer, String> attrNameArgIndex = apiPair.getAttrNameArgIndex();
+		
 		JsonObject json = null;
 		json = event.getBodyAsJson();
 		if (json == null) {
@@ -154,10 +158,30 @@ public class ApiPairAdaptor {
 					}
 				}
 			}
+			
+			if (typeIndex != null && !typeIndex.isEmpty()) {
+				for(Entry<Class<?>, Integer> entry:typeIndex.entrySet()) {
+					Class<?> cls = entry.getKey();
+					Integer i = entry.getValue();
+					args[i] = json.mapTo(cls);;
+				}
+				
+			}
+		}
+		if (cookieNameArgIndex != null && !cookieNameArgIndex.isEmpty()) {
+			for (Map.Entry<Integer, String> entry : cookieNameArgIndex.entrySet()) {
+				args[entry.getKey()] = event.getCookie(entry.getValue());
+			}
+		}
+		if (headerNameArgIndex != null && !headerNameArgIndex.isEmpty()) {
+			HttpServerRequest req = event.request();
+			for (Map.Entry<Integer, String> entry : headerNameArgIndex.entrySet()) {
+				args[entry.getKey()] = req.getHeader(entry.getValue());
+			}
 		}
 		if (attrNameArgIndex != null && !attrNameArgIndex.isEmpty()) {
 			for (Map.Entry<Integer, String> entry : attrNameArgIndex.entrySet()) {
-				args[entry.getKey()] = event.getCookie(entry.getValue());
+				args[entry.getKey()] = event.get(entry.getValue());
 			}
 		}
 		return args;
@@ -194,33 +218,38 @@ public class ApiPairAdaptor {
 
 	public void invoke(RoutingContext event)
 			throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
-		HttpServerRequest req = event.request();
-		Object[] args = resoveArgs(event);
-		req.bodyHandler(new Handler<Buffer>() {
-			@Override
-			public void handle(Buffer event) {
-				req.response().putHeader("Content-Type", "application/json");
-				Object obj = null;
-				String msg = null;
-				Class<?> returnType = apiPair.getMethod().getReturnType();
-				try {
-					obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
-				} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-					msg = e.getMessage();
+		Object[] callbackableArgs = detectCallbackableArgs(event);
+		if(callbackableArgs == null) {
+			final Object[] args = resoveArgs(event);
+			HttpServerRequest req = event.request();
+			req.bodyHandler(new Handler<Buffer>() {
+				@Override
+				public void handle(Buffer event) {
+					req.response().putHeader("Content-Type", "application/json");
+					Object obj = null;
+					String msg = null;
+					Class<?> returnType = apiPair.getMethod().getReturnType();
+					try {
+						obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
+					} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+						msg = e.getMessage();
+					}
+					if(!returnType.equals(void.class) && !returnType.equals(Void.class)) {
+						if (obj != null) {
+							req.response().end(Json.encode(obj));
+						} else {
+							req.response().end(msg);
+						}	
+					}
+					
 				}
-				if(!returnType.equals(void.class) && !returnType.equals(Void.class)) {
-					if (obj != null) {
-						req.response().end(Json.encode(obj));
-					} else {
-						req.response().end(msg);
-					}	
-				}
-				
-			}
-		});
-		req.exceptionHandler(handler -> {
-			OLog.error(handler.getMessage());
-		});
+			});
+			req.exceptionHandler(handler -> {
+				OLog.error(handler.getMessage());
+			});
+		} else {
+			apiPair.getMethod().invoke(apiPair.getBean(), callbackableArgs);
+		}
 
 	}
 }

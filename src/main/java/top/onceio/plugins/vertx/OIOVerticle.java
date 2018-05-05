@@ -72,6 +72,9 @@ public class OIOVerticle extends AbstractVerticle {
 			}
 		});
 
+		router.exceptionHandler(eh ->{
+			eh.printStackTrace();
+		});
 		server.requestHandler(router::accept).listen(port);
 	}
 }
