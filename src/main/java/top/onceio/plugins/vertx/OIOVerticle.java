@@ -22,14 +22,17 @@ public class OIOVerticle extends AbstractVerticle {
 	public void start() throws Exception {
 		int port = this.config().getInteger("port", 1230);
 		BeansIn pkgConf = this.getClass().getAnnotation(BeansIn.class);
+		String[] confDir = null;
 		String[] pkgs = null;
 		if (pkgConf != null) {
 			pkgs = pkgConf.value();
+			confDir = pkgConf.conf();
 		} else {
 			String pkg = this.getClass().getName();
 			pkgs = new String[] { pkg.substring(0, pkg.lastIndexOf('.')) };
+			confDir = new String[] {"conf"};
 		}
-		BeansEden.get().resovle(pkgs);
+		BeansEden.get().resovle(confDir,pkgs);
 		HttpServer server = vertx.createHttpServer();
 		Router router = new RouterImpl(vertx);
 		ApiResover ar = BeansEden.get().getApiResover();
