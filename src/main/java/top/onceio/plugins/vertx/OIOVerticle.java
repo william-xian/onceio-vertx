@@ -10,17 +10,20 @@ import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.HttpServer;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.handler.sockjs.SockJSHandler;
 import io.vertx.ext.web.impl.RouterImpl;
 import top.onceio.core.annotation.BeansIn;
 import top.onceio.core.beans.ApiPair;
 import top.onceio.core.beans.ApiResover;
 import top.onceio.core.beans.BeansEden;
+import top.onceio.core.mvc.annocations.Api;
 
 public class OIOVerticle extends AbstractVerticle {
 
-	@Override
-	public void start() throws Exception {
-		int port = this.config().getInteger("port", 1230);
+	protected HttpServer httpServer;
+	protected Router router;
+	
+	protected void initBeans() {
 		BeansIn pkgConf = this.getClass().getAnnotation(BeansIn.class);
 		String[] confDir = null;
 		String[] pkgs = null;
@@ -33,8 +36,11 @@ public class OIOVerticle extends AbstractVerticle {
 			confDir = new String[] {"conf"};
 		}
 		BeansEden.get().resovle(confDir,pkgs);
-		HttpServer server = vertx.createHttpServer();
-		Router router = new RouterImpl(vertx);
+	}
+	
+	
+	protected void initRouter() {
+		router = new RouterImpl(vertx);
 		ApiResover ar = BeansEden.get().getApiResover();
 		Map<String, ApiPair> p2ap = ar.getPatternToApi();
 		p2ap.forEach(new BiConsumer<String, ApiPair>() {
@@ -74,10 +80,39 @@ public class OIOVerticle extends AbstractVerticle {
 				}
 			}
 		});
-
 		router.exceptionHandler(eh ->{
 			eh.printStackTrace();
 		});
-		server.requestHandler(router::accept).listen(port);
+	}
+	
+	
+	@Override
+	public void start() throws Exception {
+		initBeans();
+		initRouter();
+		
+		VertxWebSocketHandler webSocketHandler = BeansEden.get().load(VertxWebSocketHandler.class);
+		
+		int port = this.config().getInteger("port", 1230);
+		httpServer = vertx.createHttpServer();
+		if(webSocketHandler != null) {
+			httpServer.websocketHandler(webSocketHandler);
+		}
+		
+		VertxSockJSHandler vertxSockJSHandler = BeansEden.get().load(VertxSockJSHandler.class);
+		if(vertxSockJSHandler != null) {
+			Api api = vertxSockJSHandler.getClass().getAnnotation(Api.class);
+			if(api != null) {
+				SockJSHandler sockJSHandler = SockJSHandler.create(vertx,vertxSockJSHandler.getSockJSHandlerOptions());
+				sockJSHandler.socketHandler(vertxSockJSHandler.getSocketHandler());
+				router.delete(api.value());
+				if(api.value().endsWith("*")) {
+					router.route(api.value()).handler(sockJSHandler);	
+				}else {
+					router.route(api.value()+"/*").handler(sockJSHandler);	
+				}
+			}
+		}
+		httpServer.requestHandler(router::accept).listen(port);
 	}
 }
