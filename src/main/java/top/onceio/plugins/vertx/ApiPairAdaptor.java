@@ -7,6 +7,8 @@ import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.net.URLDecoder;
 import java.sql.Date;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -19,8 +21,8 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
 import top.onceio.core.beans.ApiPair;
-import top.onceio.core.db.dao.Cnd;
 import top.onceio.core.db.dao.DaoHolder;
+import top.onceio.core.db.dao.tpl.Cnd;
 import top.onceio.core.db.dao.tpl.SelectTpl;
 import top.onceio.core.db.dao.tpl.UpdateTpl;
 import top.onceio.core.util.OLog;
@@ -141,15 +143,39 @@ public class ApiPairAdaptor {
 				} else {
 					if (DaoHolder.class.isAssignableFrom(apiPair.getBean().getClass())) {
 						Type t = DaoHolder.class.getTypeParameters()[0];
-						Class<?> tblClass = OReflectUtil.searchGenType(DaoHolder.class, apiPair.getBean().getClass(),
-								t);
+						Class<?> tblClass = OReflectUtil.searchGenType(DaoHolder.class, apiPair.getBean().getClass(),t);
 						String argStr = json.getString(entry.getValue());
 						if (type.isAssignableFrom(Cnd.class) && args[entry.getKey()] == null) {
-							args[entry.getKey()] = new Cnd<>(tblClass, argStr);
+							StringBuilder sb = new StringBuilder();
+							if(argStr != null) {
+								sb.append("cnd="+argStr);
+							}
+							String page = json.getString("page");
+							if(page != null && !page.equals("")) {
+								sb.append("&page="+page);
+							}
+							String pagesize= json.getString("pagesize");
+							if(pagesize != null && !pagesize.equals("")) {
+								sb.append("&pagesize="+pagesize);
+							}
+							String orderby = json.getString("orderby");
+							if(orderby != null && !orderby.equals("")) {
+								sb.append("&orderby="+orderby);
+							}
+							args[entry.getKey()] = new Cnd<>(tblClass, sb.toString());
 						} else if (type.isAssignableFrom(SelectTpl.class) && args[entry.getKey()] == null) {
 							args[entry.getKey()] = new SelectTpl<>(tblClass, argStr);
 						} else if (type.isAssignableFrom(UpdateTpl.class) && args[entry.getKey()] == null) {
 							args[entry.getKey()] = new UpdateTpl<>(tblClass, argStr);
+						} else if (entry.getValue().equals("id")) {
+							args[entry.getKey()] = Long.parseLong(argStr);
+						}else if (entry.getValue().equals("ids")) {
+							String[] sIds = argStr.split(",");
+							List<Long> ids = new ArrayList<>(sIds.length);
+							for (String id : sIds) {
+								ids.add(Long.parseLong(id));
+							}
+							args[entry.getKey()] = ids;
 						} else {
 							args[entry.getKey()] = trans(json, entry.getValue(), type);
 						}
@@ -232,6 +258,7 @@ public class ApiPairAdaptor {
 					try {
 						obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
 					} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+						e.printStackTrace();
 						msg = e.getMessage();
 					}
 					if(!returnType.equals(void.class) && !returnType.equals(Void.class)) {
