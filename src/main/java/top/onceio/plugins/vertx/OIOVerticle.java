@@ -12,6 +12,7 @@ import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.HttpServer;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.CookieHandler;
 import io.vertx.ext.web.handler.sockjs.SockJSHandler;
 import io.vertx.ext.web.impl.RouterImpl;
@@ -52,6 +53,7 @@ public class OIOVerticle extends AbstractVerticle {
 	
 	protected void initRouter() {
 		router.route().handler(CookieHandler.create());
+		router.route().handler(BodyHandler.create());
 		ApiResover ar = BeansEden.get().getApiResover();
 		Map<String, ApiPair> p2ap = ar.getPatternToApi();
 		p2ap.forEach(new BiConsumer<String, ApiPair>() {
@@ -60,14 +62,7 @@ public class OIOVerticle extends AbstractVerticle {
 				int sp = key.indexOf(':');
 				String method = key.substring(0, sp);
 				String uri = key.substring(sp + 1);
-				HttpMethod httpMethod = null;
-				try {
-					if (method.equals("REMOVE") || method.equals("RECOVERY")) {
-						method = "GET";
-					}
-					httpMethod = HttpMethod.valueOf(method);
-				} catch (Exception e) {
-				}
+				HttpMethod httpMethod = HttpMethod.valueOf(method);
 				Handler<RoutingContext> handler = (event -> {
 					ApiPairAdaptor adaptor = new ApiPairAdaptor(apiPair);
 					try {

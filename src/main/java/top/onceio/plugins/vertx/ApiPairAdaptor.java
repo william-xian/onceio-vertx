@@ -12,9 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import io.vertx.core.Handler;
 import io.vertx.core.MultiMap;
-import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonArray;
@@ -25,6 +23,7 @@ import top.onceio.core.db.dao.DaoHolder;
 import top.onceio.core.db.dao.tpl.Cnd;
 import top.onceio.core.db.dao.tpl.SelectTpl;
 import top.onceio.core.db.dao.tpl.UpdateTpl;
+import top.onceio.core.db.tbl.OEntity;
 import top.onceio.core.util.OLog;
 import top.onceio.core.util.OReflectUtil;
 
@@ -91,7 +90,9 @@ public class ApiPairAdaptor {
 		Map<Integer, String> attrNameArgIndex = apiPair.getAttrNameArgIndex();
 		
 		JsonObject json = null;
-		json = event.getBodyAsJson();
+		if(event.getBody().length() > 0) {
+			json = event.getBodyAsJson();	
+		}
 		if (json == null) {
 			json = new JsonObject();
 		}
@@ -138,50 +139,72 @@ public class ApiPairAdaptor {
 		if (paramNameArgIndex != null && !paramNameArgIndex.isEmpty()) {
 			for (Map.Entry<Integer, String> entry : paramNameArgIndex.entrySet()) {
 				Class<?> type = types[entry.getKey()];
-				if (entry.getValue().equals("")) {
-					args[entry.getKey()] = json.mapTo(type);
-				} else {
-					if (DaoHolder.class.isAssignableFrom(apiPair.getBean().getClass())) {
-						Type t = DaoHolder.class.getTypeParameters()[0];
-						Class<?> tblClass = OReflectUtil.searchGenType(DaoHolder.class, apiPair.getBean().getClass(),t);
+				if (DaoHolder.class.isAssignableFrom(apiPair.getBean().getClass())) {
+					Type t = DaoHolder.class.getTypeParameters()[0];
+					Class<?> tblClass = OReflectUtil.searchGenType(DaoHolder.class, apiPair.getBean().getClass(),t);
+					if (type.isAssignableFrom(Cnd.class) && args[entry.getKey()] == null) {
+						StringBuilder sb = new StringBuilder();
 						String argStr = json.getString(entry.getValue());
-						if (type.isAssignableFrom(Cnd.class) && args[entry.getKey()] == null) {
-							StringBuilder sb = new StringBuilder();
-							if(argStr != null) {
-								sb.append("cnd="+argStr);
-							}
-							String page = json.getString("page");
-							if(page != null && !page.equals("")) {
-								sb.append("&page="+page);
-							}
-							String pagesize= json.getString("pagesize");
-							if(pagesize != null && !pagesize.equals("")) {
-								sb.append("&pagesize="+pagesize);
-							}
-							String orderby = json.getString("orderby");
-							if(orderby != null && !orderby.equals("")) {
-								sb.append("&orderby="+orderby);
-							}
-							args[entry.getKey()] = new Cnd<>(tblClass, sb.toString());
-						} else if (type.isAssignableFrom(SelectTpl.class) && args[entry.getKey()] == null) {
-							args[entry.getKey()] = new SelectTpl<>(tblClass, argStr);
-						} else if (type.isAssignableFrom(UpdateTpl.class) && args[entry.getKey()] == null) {
-							args[entry.getKey()] = new UpdateTpl<>(tblClass, argStr);
-						} else if (entry.getValue().equals("id")) {
-							args[entry.getKey()] = Long.parseLong(argStr);
-						}else if (entry.getValue().equals("ids")) {
-							String[] sIds = argStr.split(",");
-							List<Long> ids = new ArrayList<>(sIds.length);
-							for (String id : sIds) {
-								ids.add(Long.parseLong(id));
-							}
-							args[entry.getKey()] = ids;
-						} else {
-							args[entry.getKey()] = trans(json, entry.getValue(), type);
+						if(argStr != null) {
+							sb.append("cnd="+argStr);
 						}
+						String page = json.getString("page");
+						if(page != null && !page.equals("")) {
+							sb.append("&page="+page);
+						}
+						String pagesize= json.getString("pagesize");
+						if(pagesize != null && !pagesize.equals("")) {
+							sb.append("&pagesize="+pagesize);
+						}
+						String orderby = json.getString("orderby");
+						if(orderby != null && !orderby.equals("")) {
+							sb.append("&orderby="+orderby);
+						}
+						args[entry.getKey()] = new Cnd<>(tblClass, sb.toString());
+					} else if (type.isAssignableFrom(SelectTpl.class) && args[entry.getKey()] == null) {
+						String argStr = json.getString(entry.getValue());
+						if(argStr == null || argStr.equals("")) {
+							args[entry.getKey()] = null;
+						}else {
+							args[entry.getKey()] = new SelectTpl<>(tblClass, argStr);
+						}
+					} else if (type.isAssignableFrom(UpdateTpl.class) && args[entry.getKey()] == null) {
+						String argStr = json.getString(entry.getValue());
+						if(argStr == null || argStr.equals("")) {
+							args[entry.getKey()] = null;
+						}else {
+							args[entry.getKey()] = new UpdateTpl<>(tblClass, argStr);
+						}
+					} else if (entry.getValue().equals("id")) {
+						String argStr = json.getString(entry.getValue());
+						args[entry.getKey()] = Long.parseLong(argStr);
+					}else if (entry.getValue().equals("ids")) {
+						String argStr = json.getString(entry.getValue());
+						String[] sIds = argStr.split(",");
+						List<Long> ids = new ArrayList<>(sIds.length);
+						for (String id : sIds) {
+							ids.add(Long.parseLong(id));
+						}
+						args[entry.getKey()] = ids;
+					} else {
+						args[entry.getKey()] = trans(json, entry.getValue(), tblClass);
+						if(type.isAssignableFrom(OEntity.class)) {
+							String strId = json.getString("id");
+							if(strId != null) {
+								Long id = Long.parseLong(strId);
+								if(args[entry.getKey()] != null) {
+									((OEntity)args[entry.getKey()]).setId(id);	
+								}
+							}
+						}
+					}
+				} else {
+					if (entry.getValue().equals("")) {
+						args[entry.getKey()] = json.mapTo(type);
 					} else {
 						args[entry.getKey()] = trans(json, entry.getValue(), type);
 					}
+
 				}
 			}
 			
@@ -236,7 +259,16 @@ public class ApiPairAdaptor {
 			} else if (type.equals(Date.class)) {
 				return new Date(obj.getLong(key));
 			} else {
-				return obj.getJsonObject(key).mapTo(type);
+				if(!"".equals(key)) {
+					JsonObject jobj = obj.getJsonObject(key);
+					if(jobj != null) {
+						return jobj.mapTo(type);
+					}else {
+						return null;
+					}
+				}else {
+					return obj.mapTo(type);
+				}
 			}
 		}
 		return null;
@@ -248,35 +280,31 @@ public class ApiPairAdaptor {
 		if(callbackableArgs == null) {
 			final Object[] args = resoveArgs(event);
 			HttpServerRequest req = event.request();
-			req.bodyHandler(new Handler<Buffer>() {
-				@Override
-				public void handle(Buffer event) {
-					req.response().putHeader("Content-Type", "application/json");
-					Object obj = null;
-					String msg = null;
-					Class<?> returnType = apiPair.getMethod().getReturnType();
-					try {
-						obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
-					} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-						e.printStackTrace();
-						msg = e.getMessage();
-					}
-					if(!returnType.equals(void.class) && !returnType.equals(Void.class)) {
-						if (obj != null) {
-							req.response().end(Json.encode(obj));
-						} else {
-							req.response().end(msg);
-						}	
-					}
-					
+
+			req.response().putHeader("Content-Type", "application/json");
+			Object obj = null;
+			String msg = null;
+
+			Class<?> returnType = apiPair.getMethod().getReturnType();
+			try {
+				obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
+			} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+				e.printStackTrace();
+				msg = e.getMessage();
+			}
+			if (!returnType.equals(void.class) && !returnType.equals(Void.class)) {
+				if (obj != null) {
+					req.response().end(Json.encode(obj));
+				} else {
+					req.response().end(msg);
 				}
-			});
+			}
+
 			req.exceptionHandler(handler -> {
 				OLog.error(handler.getMessage());
 			});
 		} else {
 			apiPair.getMethod().invoke(apiPair.getBean(), callbackableArgs);
 		}
-
 	}
 }
