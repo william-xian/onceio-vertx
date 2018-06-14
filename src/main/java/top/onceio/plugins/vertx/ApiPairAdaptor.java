@@ -142,7 +142,7 @@ public class ApiPairAdaptor {
 				if (DaoHolder.class.isAssignableFrom(apiPair.getBean().getClass())) {
 					Type t = DaoHolder.class.getTypeParameters()[0];
 					Class<?> tblClass = OReflectUtil.searchGenType(DaoHolder.class, apiPair.getBean().getClass(),t);
-					if (type.isAssignableFrom(Cnd.class) && args[entry.getKey()] == null) {
+					if (Cnd.class.isAssignableFrom(type) && args[entry.getKey()] == null) {
 						StringBuilder sb = new StringBuilder();
 						String argStr = json.getString(entry.getValue());
 						if(argStr != null) {
@@ -161,14 +161,14 @@ public class ApiPairAdaptor {
 							sb.append("&orderby="+orderby);
 						}
 						args[entry.getKey()] = new Cnd<>(tblClass, sb.toString());
-					} else if (type.isAssignableFrom(SelectTpl.class) && args[entry.getKey()] == null) {
+					} else if (SelectTpl.class.isAssignableFrom(type) && args[entry.getKey()] == null) {
 						String argStr = json.getString(entry.getValue());
 						if(argStr == null || argStr.equals("")) {
 							args[entry.getKey()] = null;
 						}else {
 							args[entry.getKey()] = new SelectTpl<>(tblClass, argStr);
 						}
-					} else if (type.isAssignableFrom(UpdateTpl.class) && args[entry.getKey()] == null) {
+					} else if (UpdateTpl.class.isAssignableFrom(type) && args[entry.getKey()] == null) {
 						String argStr = json.getString(entry.getValue());
 						if(argStr == null || argStr.equals("")) {
 							args[entry.getKey()] = null;
@@ -188,7 +188,7 @@ public class ApiPairAdaptor {
 						args[entry.getKey()] = ids;
 					} else {
 						args[entry.getKey()] = trans(json, entry.getValue(), tblClass);
-						if(type.isAssignableFrom(OEntity.class)) {
+						if(OEntity.class.isAssignableFrom(type)) {
 							String strId = json.getString("id");
 							if(strId != null) {
 								Long id = Long.parseLong(strId);
