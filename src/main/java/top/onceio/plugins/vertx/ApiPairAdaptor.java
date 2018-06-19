@@ -288,9 +288,12 @@ public class ApiPairAdaptor {
 			Class<?> returnType = apiPair.getMethod().getReturnType();
 			try {
 				obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
-			} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			} catch (IllegalAccessException | IllegalArgumentException e) {
 				e.printStackTrace();
 				msg = e.getMessage();
+			}catch (InvocationTargetException e) {
+				e.printStackTrace();
+				msg = e.getTargetException().getMessage();
 			}
 			if (!returnType.equals(void.class) && !returnType.equals(Void.class)) {
 				if (obj != null) {
@@ -298,10 +301,19 @@ public class ApiPairAdaptor {
 				} else {
 					req.response().end(msg);
 				}
+			}else {
+				if(msg != null) {
+					req.response().end(msg);
+				}else {
+					req.response().end();
+				}
 			}
 
 			req.exceptionHandler(handler -> {
 				OLog.error(handler.getMessage());
+				if(!req.isEnded()) {
+					req.response().end(handler.getMessage());	
+				}
 			});
 		} else {
 			apiPair.getMethod().invoke(apiPair.getBean(), callbackableArgs);

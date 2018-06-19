@@ -67,8 +67,10 @@ public class OIOVerticle extends AbstractVerticle {
 					ApiPairAdaptor adaptor = new ApiPairAdaptor(apiPair);
 					try {
 						adaptor.invoke(event);
-					} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+					} catch (IllegalAccessException | IllegalArgumentException e) {
 						throw new RuntimeException(e.getMessage());
+					} catch (InvocationTargetException e) {
+						throw new RuntimeException(e.getTargetException().getMessage());
 					}
 				});
 
