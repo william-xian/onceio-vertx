@@ -1,6 +1,5 @@
 package top.onceio.plugins.vertx;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -54,6 +53,9 @@ public class OIOVerticle extends AbstractVerticle {
 	protected void initRouter() {
 		router.route().handler(CookieHandler.create());
 		router.route().handler(BodyHandler.create());
+		router.exceptionHandler(e -> {
+			e.printStackTrace();
+		});
 		ApiResover ar = BeansEden.get().getApiResover();
 		Map<String, ApiPair> p2ap = ar.getPatternToApi();
 		p2ap.forEach(new BiConsumer<String, ApiPair>() {
@@ -65,13 +67,7 @@ public class OIOVerticle extends AbstractVerticle {
 				HttpMethod httpMethod = HttpMethod.valueOf(method);
 				Handler<RoutingContext> handler = (event -> {
 					ApiPairAdaptor adaptor = new ApiPairAdaptor(apiPair);
-					try {
-						adaptor.invoke(event);
-					} catch (IllegalAccessException | IllegalArgumentException e) {
-						throw new RuntimeException(e.getMessage());
-					} catch (InvocationTargetException e) {
-						throw new RuntimeException(e.getTargetException().getMessage());
-					}
+					adaptor.invoke(event);
 				});
 
 				if (uri.contains("[^/]+")) {
@@ -120,10 +116,13 @@ public class OIOVerticle extends AbstractVerticle {
 					}else {
 						router.route(sock.prefix()+"/*").handler(sockJSHandler);	
 					}
+					
 				}
 			}
 		}
-		
+		httpServer.exceptionHandler(h -> {
+			
+		});
 		httpServer.requestHandler(router::accept).listen(port);
 	}
 	
