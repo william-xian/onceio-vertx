@@ -15,7 +15,6 @@ import java.util.Map.Entry;
 
 import io.vertx.core.MultiMap;
 import io.vertx.core.http.HttpServerRequest;
-import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
@@ -27,6 +26,7 @@ import top.onceio.core.db.dao.tpl.UpdateTpl;
 import top.onceio.core.db.tbl.OEntity;
 import top.onceio.core.exception.Failed;
 import top.onceio.core.util.OReflectUtil;
+import top.onceio.core.util.OUtils;
 
 public class ApiPairAdaptor {
 	private ApiPair apiPair;
@@ -213,7 +213,6 @@ public class ApiPairAdaptor {
 					Class<?> cls = entry.getKey();
 					Integer i = entry.getValue();
 					args[i] = json.mapTo(cls);
-					;
 				}
 
 			}
@@ -286,7 +285,7 @@ public class ApiPairAdaptor {
 			try {
 				obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
 				if (!returnType.equals(void.class) && !returnType.equals(Void.class) && obj != null) {
-					req.response().end(Json.encode(obj));
+					req.response().end(OUtils.toJson(obj));
 				} else {
 					req.response().end();
 				}
@@ -315,7 +314,7 @@ public class ApiPairAdaptor {
 					req.response().setStatusCode(500);
 					te.printStackTrace();
 				}
-				req.response().end(Json.encode(map));
+				req.response().end(OUtils.toJson(map));
 			}
 		} else {
 			try {
