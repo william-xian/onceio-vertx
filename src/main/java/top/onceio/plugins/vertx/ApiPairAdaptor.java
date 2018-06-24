@@ -280,7 +280,8 @@ public class ApiPairAdaptor {
 		if (callbackableArgs == null) {
 			final Object[] args = resoveArgs(event);
 			HttpServerRequest req = event.request();
-			req.response().putHeader("Content-Type", "application/json");
+			req.response().putHeader("Content-Type", "application/json;charset=utf-8");
+			
 			Class<?> returnType = apiPair.getMethod().getReturnType();
 			try {
 				obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
