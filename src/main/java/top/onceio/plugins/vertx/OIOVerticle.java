@@ -6,6 +6,7 @@ import java.util.function.BiConsumer;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Handler;
+import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.HttpServer;
@@ -34,6 +35,7 @@ public class OIOVerticle extends AbstractVerticle {
 	protected void initBeans() {
 		EventBus eb = vertx.eventBus();
 		BeansEden.get().store(EventBus.class, null, eb);
+		BeansEden.get().store(Vertx.class, null, vertx);
 		
 		BeansIn pkgConf = this.getClass().getAnnotation(BeansIn.class);
 		String[] confDir = null;
