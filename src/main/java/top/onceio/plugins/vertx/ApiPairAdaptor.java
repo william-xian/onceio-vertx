@@ -18,7 +18,9 @@ import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
+import top.onceio.core.annotation.Validate;
 import top.onceio.core.beans.ApiPair;
+import top.onceio.core.db.annotation.Tbl;
 import top.onceio.core.db.dao.DaoHolder;
 import top.onceio.core.db.dao.tpl.Cnd;
 import top.onceio.core.db.dao.tpl.SelectTpl;
@@ -233,6 +235,14 @@ public class ApiPairAdaptor {
 				args[entry.getKey()] = event.get(entry.getValue());
 			}
 		}
+		//TODO 表单验证
+		Validate[] validates = new Validate[types.length];
+		Tbl[] tbls = new Tbl[types.length];
+		for(int i =0 ; i < validates.length; i++) {
+			validates[i] = apiPair.getMethod().getParameters()[i].getAnnotation(Validate.class);
+			tbls[i] = types[i].getAnnotation(Tbl.class);
+ 		}
+
 		return args;
 	}
 
