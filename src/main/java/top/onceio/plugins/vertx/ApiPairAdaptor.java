@@ -17,6 +17,7 @@ import io.vertx.core.MultiMap;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.Cookie;
 import io.vertx.ext.web.RoutingContext;
 import top.onceio.core.annotation.Validate;
 import top.onceio.core.beans.ApiPair;
@@ -201,12 +202,7 @@ public class ApiPairAdaptor {
 						}
 					}
 				} else {
-					if (entry.getValue().equals("")) {
-						args[entry.getKey()] = json.mapTo(type);
-					} else {
-						args[entry.getKey()] = trans(json, entry.getValue(), type);
-					}
-
+					args[entry.getKey()] = trans(json, entry.getValue(), type);
 				}
 			}
 
@@ -216,23 +212,28 @@ public class ApiPairAdaptor {
 					Integer i = entry.getValue();
 					args[i] = json.mapTo(cls);
 				}
-
 			}
 		}
 		if (cookieNameArgIndex != null && !cookieNameArgIndex.isEmpty()) {
 			for (Map.Entry<Integer, String> entry : cookieNameArgIndex.entrySet()) {
-				args[entry.getKey()] = event.getCookie(entry.getValue());
+				Cookie cookie = event.getCookie(entry.getValue());
+				if(cookie != null) {
+					Class<?> type = types[entry.getKey()];
+					args[entry.getKey()] = trans(cookie.getValue(), type);
+				}
 			}
 		}
 		if (headerNameArgIndex != null && !headerNameArgIndex.isEmpty()) {
 			HttpServerRequest req = event.request();
 			for (Map.Entry<Integer, String> entry : headerNameArgIndex.entrySet()) {
-				args[entry.getKey()] = req.getHeader(entry.getValue());
+				Class<?> type = types[entry.getKey()];
+				args[entry.getKey()] = trans(req.getHeader(entry.getValue()),type);
 			}
 		}
 		if (attrNameArgIndex != null && !attrNameArgIndex.isEmpty()) {
 			for (Map.Entry<Integer, String> entry : attrNameArgIndex.entrySet()) {
-				args[entry.getKey()] = event.get(entry.getValue());
+				Class<?> type = types[entry.getKey()];
+				args[entry.getKey()] = trans(event.get(entry.getValue()),type);
 			}
 		}
 		//TODO 表单验证
@@ -246,6 +247,35 @@ public class ApiPairAdaptor {
 		return args;
 	}
 
+	public Object trans(Object val,Class<?> type) {
+		if(val == null) {
+			return null;
+		}
+		if (type.equals(String.class)) {
+			return val.toString();
+		} else if (type.equals(int.class) || type.equals(Integer.class)) {
+			return Integer.valueOf(val.toString());
+		} else if (type.equals(long.class) || type.equals(Long.class)) {
+			return Long.valueOf(val.toString());
+		} else if (type.equals(boolean.class) || type.equals(Boolean.class)) {
+			return Boolean.valueOf(val.toString());
+		} else if (type.equals(byte.class) || type.equals(Byte.class)) {
+			return Byte.valueOf(val.toString());
+		} else if (type.equals(short.class) || type.equals(Short.class)) {
+			return Short.valueOf(val.toString());
+		} else if (type.equals(double.class) || type.equals(Double.class)) {
+			return Double.valueOf(val.toString());
+		} else if (type.equals(float.class) || type.equals(Float.class)) {
+			return Float.valueOf(val.toString());
+		} else if (type.equals(BigDecimal.class)) {
+			return new BigDecimal(val.toString());
+		} else if (type.equals(Date.class)) {
+			return new Date(Long.valueOf(val.toString()));
+		}else {
+			return null;
+		}
+	}
+	
 	private Object trans(JsonObject obj, String key, Class<?> type) {
 		if (obj != null) {
 			if (!"".equals(key)) {
