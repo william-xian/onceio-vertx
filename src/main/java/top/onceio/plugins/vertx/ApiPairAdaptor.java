@@ -250,11 +250,13 @@ public class ApiPairAdaptor {
 		if (obj != null) {
 			if (!"".equals(key)) {
 				Object val = obj.getValue(key);
-				Class<?> valType = val.getClass();
-				if(val == null || valType.equals(type)) {
+				if(val == null) {
 					return val;
 				} else {
-					if (type.equals(String.class)) {
+					Class<?> valType = val.getClass();
+					if(valType.equals(type)) {
+						return val;
+					} else if (type.equals(String.class)) {
 						return val.toString();
 					} else if (type.equals(int.class) || type.equals(Integer.class)) {
 						return Integer.valueOf(val.toString());
@@ -305,7 +307,7 @@ public class ApiPairAdaptor {
 				if (!returnType.equals(void.class) && !returnType.equals(Void.class) && obj != null) {
 					req.response().end(OUtils.toJson(obj));
 				} else {
-					req.response().end();
+					req.response().end("{}");
 				}
 			} catch (IllegalAccessException | IllegalArgumentException e) {
 				req.response().end(e.getMessage());
