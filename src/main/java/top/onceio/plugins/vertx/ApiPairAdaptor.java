@@ -248,37 +248,44 @@ public class ApiPairAdaptor {
 
 	private Object trans(JsonObject obj, String key, Class<?> type) {
 		if (obj != null) {
-			if (type.equals(String.class)) {
-				return obj.getString(key);
-			} else if (type.equals(int.class) || type.equals(Integer.class)) {
-				return obj.getInteger(key);
-			} else if (type.equals(long.class) || type.equals(Long.class)) {
-				return obj.getLong(key);
-			} else if (type.equals(boolean.class) || type.equals(Boolean.class)) {
-				return obj.getBoolean(key);
-			} else if (type.equals(byte.class) || type.equals(Byte.class)) {
-				return obj.getBinary(key)[0];
-			} else if (type.equals(short.class) || type.equals(Short.class)) {
-				return obj.getInteger(key);
-			} else if (type.equals(double.class) || type.equals(Double.class)) {
-				return obj.getDouble(key);
-			} else if (type.equals(float.class) || type.equals(Float.class)) {
-				return obj.getFloat(key);
-			} else if (type.equals(BigDecimal.class)) {
-				return new BigDecimal(obj.getString(key));
-			} else if (type.equals(Date.class)) {
-				return new Date(obj.getLong(key));
-			} else {
-				if (!"".equals(key)) {
-					JsonObject jobj = obj.getJsonObject(key);
-					if (jobj != null) {
-						return jobj.mapTo(type);
-					} else {
-						return null;
-					}
+			if (!"".equals(key)) {
+				Object val = obj.getValue(key);
+				Class<?> valType = val.getClass();
+				if(val == null || valType.equals(type)) {
+					return val;
 				} else {
-					return obj.mapTo(type);
+					if (type.equals(String.class)) {
+						return val.toString();
+					} else if (type.equals(int.class) || type.equals(Integer.class)) {
+						return Integer.valueOf(val.toString());
+					} else if (type.equals(long.class) || type.equals(Long.class)) {
+						return Long.valueOf(val.toString());
+					} else if (type.equals(boolean.class) || type.equals(Boolean.class)) {
+						return Boolean.valueOf(val.toString());
+					} else if (type.equals(byte.class) || type.equals(Byte.class)) {
+						return obj.getBinary(key)[0];
+					} else if (type.equals(short.class) || type.equals(Short.class)) {
+						return Short.valueOf(val.toString());
+					} else if (type.equals(double.class) || type.equals(Double.class)) {
+						return Double.valueOf(val.toString());
+					} else if (type.equals(float.class) || type.equals(Float.class)) {
+						return Float.valueOf(val.toString());
+					} else if (type.equals(BigDecimal.class)) {
+						return new BigDecimal(val.toString());
+					} else if (type.equals(Date.class)) {
+						return new Date(Long.valueOf(val.toString()));
+					} else {
+						JsonObject jobj = obj.getJsonObject(key);
+						if (jobj != null) {
+							return jobj.mapTo(type);
+						} else {
+							return null;
+						}
+					}
 				}
+				
+			} else {
+				return obj.mapTo(type);
 			}
 		}
 		return null;
