@@ -15,6 +15,7 @@ import java.util.Map.Entry;
 
 import io.vertx.core.MultiMap;
 import io.vertx.core.http.HttpServerRequest;
+import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Cookie;
@@ -306,6 +307,8 @@ public class ApiPairAdaptor {
 						return new BigDecimal(val.toString());
 					} else if (type.equals(Date.class)) {
 						return new Date(Long.valueOf(val.toString()));
+					} else if(valType.equals(String.class)){
+						return Json.decodeValue((String)val, type);
 					} else {
 						JsonObject jobj = obj.getJsonObject(key);
 						if (jobj != null) {
