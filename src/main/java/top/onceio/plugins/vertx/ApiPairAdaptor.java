@@ -334,7 +334,8 @@ public class ApiPairAdaptor {
 			HttpServerRequest req = event.request();
 			req.response().headers().set("Content-Type", "application/json;charset=utf-8");
 			req.response().headers().set("Access-Control-Allow-Origin","*");
-			req.response().headers().set("Access-Control-Allow-Methods","GET,POST,PUT,PATCH,HEAD,OPTIONS,TRACE");
+			//req.response().headers().set("Access-Control-Allow-Methods","GET,POST,PUT,PATCH,HEAD,OPTIONS,TRACE");
+			req.response().headers().set("Access-Control-Allow-Methods","GET,POST,PUT,PATCH");
 			req.response().headers().set("Access-Control-Allow-Headers","Origin, X-Requested-With, Content-Type, Accept");
 			
 			Class<?> returnType = apiPair.getMethod().getReturnType();
