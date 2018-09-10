@@ -333,7 +333,11 @@ public class ApiPairAdaptor {
 			final Object[] args = resoveArgs(event);
 			HttpServerRequest req = event.request();
 			req.response().headers().set("Content-Type", "application/json;charset=utf-8");
-			req.response().headers().set("Access-Control-Allow-Origin", req.getHeader("Origin"));
+			String origin = req.getHeader("Origin");
+			if(origin != null) {
+				req.response().headers().set("Access-Control-Allow-Origin", origin);
+					
+			}
 			req.response().headers().set("Access-Control-Allow-Credentials", "true");
 			req.response().headers().set("Access-Control-Allow-Methods","GET,POST,PUT,PATCH,HEAD,OPTIONS,TRACE");
 			req.response().headers().set("Access-Control-Allow-Headers","Origin, X-Requested-With, Content-Type, Accept, Cookie, userId, accessToken");
