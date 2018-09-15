@@ -1,8 +1,11 @@
 package top.onceio.plugins.vertx;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiConsumer;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Handler;
@@ -60,33 +63,38 @@ public class OIOVerticle extends AbstractVerticle {
 		});
 		ApiResover ar = BeansEden.get().getApiResover();
 		Map<String, ApiPair> p2ap = ar.getPatternToApi();
-		p2ap.forEach(new BiConsumer<String, ApiPair>() {
+		List<String> lst = new ArrayList<>(p2ap.keySet());
+		/**使得正则排序在后面，保证/get/byIds优先于/get/{id}匹配 */
+		Collections.sort(lst, new Comparator<String>() {
 			@Override
-			public void accept(String key, ApiPair apiPair) {
-				int sp = key.indexOf(':');
-				String method = key.substring(0, sp);
-				String uri = key.substring(sp + 1);
-				HttpMethod httpMethod = HttpMethod.valueOf(method);
-				Handler<RoutingContext> handler = (event -> {
-					ApiPairAdaptor adaptor = new ApiPairAdaptor(apiPair);
-					adaptor.invoke(event);
-				});
-
-				if (uri.contains("[^/]+")) {
-					if (httpMethod != null) {
-						router.routeWithRegex(httpMethod, uri).handler(handler);
-					} else {
-						router.routeWithRegex(uri).handler(handler);
-					}
-				} else {
-					if (httpMethod != null) {
-						router.route(httpMethod, uri).handler(handler);
-					} else {
-						router.route(uri).handler(handler);
-					}
-				}
+			public int compare(String o1, String o2) {
+				return o2.compareTo(o1);
 			}
 		});
+		for(String key:lst) {
+			ApiPair apiPair = p2ap.get(key);
+			int sp = key.indexOf(':');
+			String method = key.substring(0, sp);
+			String uri = key.substring(sp + 1);
+			HttpMethod httpMethod = HttpMethod.valueOf(method);
+			Handler<RoutingContext> handler = (event -> {
+				ApiPairAdaptor adaptor = new ApiPairAdaptor(apiPair);
+				adaptor.invoke(event);
+			});
+			if (uri.contains("[^/]+")) {
+				if (httpMethod != null) {
+					router.routeWithRegex(httpMethod, uri).handler(handler);
+				} else {
+					router.routeWithRegex(uri).handler(handler);
+				}
+			} else {
+				if (httpMethod != null) {
+					router.route(httpMethod, uri).handler(handler);
+				} else {
+					router.route(uri).handler(handler);
+				}
+			}
+		}
 		router.exceptionHandler(eh ->{
 			eh.printStackTrace();
 		});

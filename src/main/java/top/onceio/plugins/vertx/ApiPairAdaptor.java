@@ -27,7 +27,6 @@ import top.onceio.core.db.dao.DaoHolder;
 import top.onceio.core.db.dao.tpl.Cnd;
 import top.onceio.core.db.dao.tpl.SelectTpl;
 import top.onceio.core.db.dao.tpl.UpdateTpl;
-import top.onceio.core.db.tbl.OEntity;
 import top.onceio.core.exception.Failed;
 import top.onceio.core.util.OReflectUtil;
 import top.onceio.core.util.OUtils;
@@ -179,28 +178,10 @@ public class ApiPairAdaptor {
 						} else {
 							args[entry.getKey()] = new UpdateTpl<>(tblClass, argStr);
 						}
-					} else if (entry.getValue().equals("id")) {
-						String argStr = json.getString(entry.getValue());
-						args[entry.getKey()] = Long.parseLong(argStr);
-					} else if (entry.getValue().equals("ids")) {
-						String argStr = json.getString(entry.getValue());
-						String[] sIds = argStr.split(",");
-						List<Long> ids = new ArrayList<>(sIds.length);
-						for (String id : sIds) {
-							ids.add(Long.parseLong(id));
-						}
-						args[entry.getKey()] = ids;
+					} else if (!entry.getValue().equals("")) {
+						args[entry.getKey()] = trans(json, entry.getValue(), type);
 					} else {
 						args[entry.getKey()] = trans(json, entry.getValue(), tblClass);
-						if (OEntity.class.isAssignableFrom(type)) {
-							String strId = json.getString("id");
-							if (strId != null) {
-								Long id = Long.parseLong(strId);
-								if (args[entry.getKey()] != null) {
-									((OEntity) args[entry.getKey()]).setId(id);
-								}
-							}
-						}
 					}
 				} else {
 					args[entry.getKey()] = trans(json, entry.getValue(), type);
