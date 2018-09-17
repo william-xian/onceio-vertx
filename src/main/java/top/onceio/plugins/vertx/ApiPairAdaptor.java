@@ -320,7 +320,7 @@ public class ApiPairAdaptor {
 					
 			}
 			req.response().headers().set("Access-Control-Allow-Credentials", "true");
-			req.response().headers().set("Access-Control-Allow-Methods","GET,POST,PUT,PATCH,HEAD,OPTIONS,TRACE");
+			req.response().headers().set("Access-Control-Allow-Methods","GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS,TRACE");
 			req.response().headers().set("Access-Control-Allow-Headers","Origin, X-Requested-With, Content-Type, Accept, Cookie, userId, accessToken");
 			
 			Class<?> returnType = apiPair.getMethod().getReturnType();
