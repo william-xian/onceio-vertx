@@ -1,11 +1,6 @@
 package top.onceio.plugins.vertx;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Handler;
@@ -27,120 +22,124 @@ import top.onceio.plugins.vertx.annotation.AsSock;
 import top.onceio.plugins.vertx.annotation.AsWebsocket;
 
 public class OIOVerticle extends AbstractVerticle {
-	protected HttpServer httpServer;
-	protected Router router;
-	
-	protected void createHttpServerAndRouter() {
-		httpServer = vertx.createHttpServer();
-		router = new RouterImpl(vertx);
-	}
-	
-	protected void initBeans() {
-		EventBus eb = vertx.eventBus();
-		BeansEden.get().store(EventBus.class, null, eb);
-		BeansEden.get().store(Vertx.class, null, vertx);
-		
-		BeansIn pkgConf = this.getClass().getAnnotation(BeansIn.class);
-		String[] confDir = null;
-		String[] pkgs = null;
-		if (pkgConf != null) {
-			pkgs = pkgConf.value();
-			confDir = pkgConf.conf();
-		} else {
-			String pkg = this.getClass().getName();
-			pkgs = new String[] { pkg.substring(0, pkg.lastIndexOf('.')) };
-			confDir = new String[] {"conf"};
-		}
-		BeansEden.get().addAnnotation(AsSock.class,AsWebsocket.class);
-		BeansEden.get().resovle(confDir,pkgs);
-	}
-	
-	protected void initRouter() {
-		router.route().handler(CookieHandler.create());
-		router.route().handler(BodyHandler.create());
-		router.exceptionHandler(e -> {
-			e.printStackTrace();
-		});
-		ApiResover ar = BeansEden.get().getApiResover();
-		Map<String, ApiPair> p2ap = ar.getPatternToApi();
-		List<String> lst = new ArrayList<>(p2ap.keySet());
-		/**使得正则排序在后面，保证/get/byIds优先于/get/{id}匹配 */
-		Collections.sort(lst, new Comparator<String>() {
-			@Override
-			public int compare(String o1, String o2) {
-				return o2.compareTo(o1);
-			}
-		});
-		for(String key:lst) {
-			ApiPair apiPair = p2ap.get(key);
-			int sp = key.indexOf(':');
-			String method = key.substring(0, sp);
-			String uri = key.substring(sp + 1);
-			HttpMethod httpMethod = HttpMethod.valueOf(method);
-			Handler<RoutingContext> handler = (event -> {
-				ApiPairAdaptor adaptor = new ApiPairAdaptor(apiPair);
-				adaptor.invoke(event);
-			});
-			if (uri.contains("[^/]+")) {
-				if (httpMethod != null) {
-					router.routeWithRegex(httpMethod, uri).handler(handler);
-				} else {
-					router.routeWithRegex(uri).handler(handler);
-				}
-			} else {
-				if (httpMethod != null) {
-					router.route(httpMethod, uri).handler(handler);
-				} else {
-					router.route(uri).handler(handler);
-				}
-			}
-		}
-		router.exceptionHandler(eh ->{
-			eh.printStackTrace();
-		});
-	}
-	
-	protected void startServer() {
-		int port = this.config().getInteger("port", 1230);
-		Set<Class<?>> websockets = BeansEden.get().getClassByAnnotation(AsWebsocket.class);
-		if(!websockets.isEmpty()) {
-			Class<?> wsh = websockets.iterator().next();
-			Object bean = BeansEden.get().load(wsh);
-			if (bean != null && (bean instanceof VertxWebSocketHandler)) {
-				VertxWebSocketHandler webSocketHandler = (VertxWebSocketHandler) bean;
-				httpServer.websocketHandler(webSocketHandler);
-			}
-		}
-		
-		Set<Class<?>> classes = BeansEden.get().getClassByAnnotation(AsSock.class);
-		for(Class<?> clazz:classes) {
-			Object bean = BeansEden.get().load(clazz);
-			if(bean != null && (bean instanceof VertxSockJSHandler)) {
-				VertxSockJSHandler vertxSockJSHandler = (VertxSockJSHandler)bean;
-				AsSock sock = vertxSockJSHandler.getClass().getAnnotation(AsSock.class);
-				if(sock != null) {
-					SockJSHandler sockJSHandler = SockJSHandler.create(vertx,vertxSockJSHandler.getSockJSHandlerOptions());
-					sockJSHandler.socketHandler(vertxSockJSHandler.getSocketHandler());
-					if(sock.prefix().endsWith("*")) {
-						router.route(sock.prefix()).handler(sockJSHandler);	
-					}else {
-						router.route(sock.prefix()+"/*").handler(sockJSHandler);	
-					}
-					
-				}
-			}
-		}
-		httpServer.exceptionHandler(h -> {
-			
-		});
-		httpServer.requestHandler(router::accept).listen(port);
-	}
-	
-	@Override
-	public void start() throws Exception {
-		createHttpServerAndRouter();
-		initBeans();
-		initRouter();
-		startServer();
-	}
+    protected HttpServer httpServer;
+    protected Router router;
+
+    protected void createHttpServerAndRouter() {
+        httpServer = vertx.createHttpServer();
+        router = new RouterImpl(vertx);
+    }
+
+    protected void initBeans() {
+        EventBus eb = vertx.eventBus();
+        BeansEden.get().store(EventBus.class, null, eb);
+        BeansEden.get().store(Vertx.class, null, vertx);
+
+        BeansIn pkgConf = this.getClass().getAnnotation(BeansIn.class);
+        List<String> confDir = new ArrayList<>();
+        String[] pkgs = null;
+        if (pkgConf != null) {
+            pkgs = pkgConf.value();
+            confDir.addAll(Arrays.asList(pkgConf.conf()));
+        } else {
+            String pkg = this.getClass().getName();
+            pkgs = new String[]{pkg.substring(0, pkg.lastIndexOf('.'))};
+            confDir.add("conf");
+        }
+        String confDef = System.getProperty("conf");
+        if (confDef != null) {
+            confDir.add(confDef);
+        }
+        BeansEden.get().addAnnotation(AsSock.class, AsWebsocket.class);
+        BeansEden.get().resolve(confDir.toArray(new String[0]), pkgs);
+    }
+
+    protected void initRouter() {
+        router.route().handler(CookieHandler.create());
+        router.route().handler(BodyHandler.create());
+        router.exceptionHandler(e -> {
+            e.printStackTrace();
+        });
+        ApiResover ar = BeansEden.get().getApiResolver();
+        Map<String, ApiPair> p2ap = ar.getPatternToApi();
+        List<String> lst = new ArrayList<>(p2ap.keySet());
+        /**使得正则排序在后面，保证/get/byIds优先于/get/{id}匹配 */
+        Collections.sort(lst, new Comparator<String>() {
+            @Override
+            public int compare(String o1, String o2) {
+                return o2.compareTo(o1);
+            }
+        });
+        for (String key : lst) {
+            ApiPair apiPair = p2ap.get(key);
+            int sp = key.indexOf(':');
+            String method = key.substring(0, sp);
+            String uri = key.substring(sp + 1);
+            HttpMethod httpMethod = HttpMethod.valueOf(method);
+            Handler<RoutingContext> handler = (event -> {
+                ApiPairAdaptor adaptor = new ApiPairAdaptor(apiPair);
+                adaptor.invoke(event);
+            });
+            if (uri.contains("[^/]+")) {
+                if (httpMethod != null) {
+                    router.routeWithRegex(httpMethod, uri).handler(handler);
+                } else {
+                    router.routeWithRegex(uri).handler(handler);
+                }
+            } else {
+                if (httpMethod != null) {
+                    router.route(httpMethod, uri).handler(handler);
+                } else {
+                    router.route(uri).handler(handler);
+                }
+            }
+        }
+        router.exceptionHandler(eh -> {
+            eh.printStackTrace();
+        });
+    }
+
+    protected void startServer() {
+        int port = this.config().getInteger("port", 1230);
+        Set<Class<?>> websockets = BeansEden.get().getClassByAnnotation(AsWebsocket.class);
+        if (!websockets.isEmpty()) {
+            Class<?> wsh = websockets.iterator().next();
+            Object bean = BeansEden.get().load(wsh);
+            if (bean != null && (bean instanceof VertxWebSocketHandler)) {
+                VertxWebSocketHandler webSocketHandler = (VertxWebSocketHandler) bean;
+                httpServer.websocketHandler(webSocketHandler);
+            }
+        }
+
+        Set<Class<?>> classes = BeansEden.get().getClassByAnnotation(AsSock.class);
+        for (Class<?> clazz : classes) {
+            Object bean = BeansEden.get().load(clazz);
+            if (bean != null && (bean instanceof VertxSockJSHandler)) {
+                VertxSockJSHandler vertxSockJSHandler = (VertxSockJSHandler) bean;
+                AsSock sock = vertxSockJSHandler.getClass().getAnnotation(AsSock.class);
+                if (sock != null) {
+                    SockJSHandler sockJSHandler = SockJSHandler.create(vertx, vertxSockJSHandler.getSockJSHandlerOptions());
+                    sockJSHandler.socketHandler(vertxSockJSHandler.getSocketHandler());
+                    if (sock.prefix().endsWith("*")) {
+                        router.route(sock.prefix()).handler(sockJSHandler);
+                    } else {
+                        router.route(sock.prefix() + "/*").handler(sockJSHandler);
+                    }
+
+                }
+            }
+        }
+        httpServer.exceptionHandler(h -> {
+
+        });
+        httpServer.requestHandler(router::accept).listen(port);
+    }
+
+    @Override
+    public void start() throws Exception {
+        createHttpServerAndRouter();
+        initBeans();
+        initRouter();
+        startServer();
+    }
 }

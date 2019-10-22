@@ -77,9 +77,8 @@ public class ApiPairAdaptor {
 
 	/**
 	 * 根据方法参数及其注解，从req（Attr,Param,Body,Cookie)中取出数据 TODO Header
-	 * 
-	 * @param result
-	 * @param req
+	 *
+	 * @param event
 	 */
 	private Object[] resoveArgs(final RoutingContext event) {
 		Map<String, Integer> nameVarIndex = apiPair.getNameVarIndex();
