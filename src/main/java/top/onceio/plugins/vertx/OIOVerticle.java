@@ -142,4 +142,13 @@ public class OIOVerticle extends AbstractVerticle {
         initRouter();
         startServer();
     }
+
+    @Override
+
+    public void stop() throws Exception {
+        super.stop();
+
+        BeansEden.get().destroy();
+
+    }
 }
