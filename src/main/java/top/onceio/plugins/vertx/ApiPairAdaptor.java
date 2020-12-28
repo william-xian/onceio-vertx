@@ -52,7 +52,7 @@ public class ApiPairAdaptor {
         return jobj;
     }
 
-    private Object[] detectCallbackableArgs(final RoutingContext event) {
+    private Object[] detectInvokeArgs(final RoutingContext event) {
         Map<Class<?>, Integer> typeIndex = apiPair.getTypeIndex();
         Method method = apiPair.getMethod();
         Object[] args = new Object[method.getParameterCount()];
@@ -300,8 +300,8 @@ public class ApiPairAdaptor {
 
     public void invoke(RoutingContext event) {
         Object obj = null;
-        Object[] callbackableArgs = detectCallbackableArgs(event);
-        if (callbackableArgs == null) {
+        Object[] invokeArgs = detectInvokeArgs(event);
+        if (invokeArgs == null) {
             final Object[] args = resoveArgs(event);
             HttpServerRequest req = event.request();
             req.response().headers().set("Content-Type", "application/json;charset=utf-8");
@@ -352,7 +352,7 @@ public class ApiPairAdaptor {
             }
         } else {
             try {
-                apiPair.getMethod().invoke(apiPair.getBean(), callbackableArgs);
+                apiPair.getMethod().invoke(apiPair.getBean(), invokeArgs);
             } catch (IllegalAccessException | IllegalArgumentException e) {
 
             } catch (InvocationTargetException e) {
