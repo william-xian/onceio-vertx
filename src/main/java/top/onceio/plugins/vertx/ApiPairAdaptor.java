@@ -100,18 +100,6 @@ public class ApiPairAdaptor {
         if (json == null) {
             json = new JsonObject();
         }
-        String uri = event.normalisedPath();
-        try {
-            uri = URLDecoder.decode(uri, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        String[] uris = uri.split("/");
-        for (String name : nameVarIndex.keySet()) {
-            Integer i = nameVarIndex.get(name);
-            String v = uris[i];
-            json.put(name, v);
-        }
         MultiMap map = event.queryParams();
         for (Map.Entry<String, String> entry : map.entries()) {
             String val = entry.getValue();
@@ -137,6 +125,18 @@ public class ApiPairAdaptor {
                     jobj.put(pname, ja);
                 }
             }
+        }
+        String uri = event.normalisedPath();
+        try {
+            uri = URLDecoder.decode(uri, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+        String[] uris = uri.split("/");
+        for (String name : nameVarIndex.keySet()) {
+            Integer i = nameVarIndex.get(name);
+            String v = uris[i];
+            json.put(name, v);
         }
         Class<?>[] types = apiPair.getMethod().getParameterTypes();
 
