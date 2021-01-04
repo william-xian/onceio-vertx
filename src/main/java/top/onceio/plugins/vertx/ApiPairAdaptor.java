@@ -81,7 +81,7 @@ public class ApiPairAdaptor {
      *
      * @param event
      */
-    private Object[] resoveArgs(final RoutingContext event) {
+    private Object[] resolveArgs(final RoutingContext event) {
         Map<String, Integer> nameVarIndex = apiPair.getNameVarIndex();
         Map<Class<?>, Integer> typeIndex = apiPair.getTypeIndex();
         Method method = apiPair.getMethod();
@@ -302,17 +302,18 @@ public class ApiPairAdaptor {
         Object obj = null;
         Object[] invokeArgs = detectInvokeArgs(event);
         if (invokeArgs == null) {
-            final Object[] args = resoveArgs(event);
+            final Object[] args = resolveArgs(event);
             HttpServerRequest req = event.request();
-            req.response().headers().set("Content-Type", "application/json;charset=utf-8");
+            MultiMap headers = req.response().headers();
+
+            headers.set("Content-Type", "application/json;charset=utf-8");
             String origin = req.getHeader("Origin");
             if (origin != null) {
-                req.response().headers().set("Access-Control-Allow-Origin", origin);
-
+                headers.set("Access-Control-Allow-Origin", origin);
             }
-            req.response().headers().set("Access-Control-Allow-Credentials", "true");
-            req.response().headers().set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS,TRACE");
-            req.response().headers().set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Cookie, userId, accessToken");
+            headers.set("Access-Control-Allow-Credentials", "true");
+            headers.set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS,TRACE");
+            headers.set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Cookie, userId, accessToken");
 
             Class<?> returnType = apiPair.getMethod().getReturnType();
             try {
