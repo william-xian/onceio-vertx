@@ -300,65 +300,57 @@ public class ApiPairAdaptor {
 
     public void invoke(RoutingContext event) {
         Object obj = null;
-        Object[] invokeArgs = detectInvokeArgs(event);
-        if (invokeArgs == null) {
-            final Object[] args = resolveArgs(event);
-            HttpServerRequest req = event.request();
-            MultiMap headers = req.response().headers();
+        Object[] args = detectInvokeArgs(event);
+        if (args == null) {
+            args = resolveArgs(event);
+        }
+        HttpServerRequest req = event.request();
+        MultiMap headers = req.response().headers();
 
-            headers.set("Content-Type", "application/json;charset=utf-8");
-            String origin = req.getHeader("Origin");
-            if (origin != null) {
-                headers.set("Access-Control-Allow-Origin", origin);
+        headers.set("Content-Type", "application/json; charset=UTF-8");
+        String origin = req.getHeader("Origin");
+        if (origin != null) {
+            headers.set("Access-Control-Allow-Origin", origin);
+        }
+        headers.set("Access-Control-Allow-Credentials", "true");
+        headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, TRACE");
+        headers.set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Cookie, userId, accessToken");
+
+        Class<?> returnType = apiPair.getMethod().getReturnType();
+        try {
+            obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
+            if (!returnType.equals(void.class) && !returnType.equals(Void.class) && obj != null) {
+                String s = Json.encode(obj);
+                req.response().end(s);
+            } else {
+                req.response().end("{}");
             }
-            headers.set("Access-Control-Allow-Credentials", "true");
-            headers.set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS,TRACE");
-            headers.set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Cookie, userId, accessToken");
-
-            Class<?> returnType = apiPair.getMethod().getReturnType();
-            try {
-                obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
-                if (!returnType.equals(void.class) && !returnType.equals(Void.class) && obj != null) {
-                    String s = Json.encode(obj);
-                    req.response().end(s);
+        } catch (IllegalAccessException | IllegalArgumentException e) {
+            req.response().end(e.getMessage());
+        } catch (InvocationTargetException e) {
+            Map<String, Object> map = new HashMap<>();
+            Throwable te = e.getTargetException();
+            if (te instanceof Failed) {
+                Failed failed = (Failed) te;
+                map.put("data", failed.getData());
+                map.put("args", failed.getArgs());
+                map.put("format", failed.getFormat());
+                map.put("ERROR", String.format(failed.getFormat(), failed.getArgs()));
+            } else {
+                if (te.getMessage() != null && !te.getMessage().equals("")) {
+                    map.put("ERROR", te.getMessage());
                 } else {
-                    req.response().end("{}");
+                    map.put("ERROR", te.getClass().getName());
                 }
-            } catch (IllegalAccessException | IllegalArgumentException e) {
-                req.response().end(e.getMessage());
-            } catch (InvocationTargetException e) {
-                Map<String, Object> map = new HashMap<>();
-                Throwable te = e.getTargetException();
-                if (te instanceof Failed) {
-                    Failed failed = (Failed) te;
-                    map.put("data", failed.getData());
-                    map.put("args", failed.getArgs());
-                    map.put("format", failed.getFormat());
-                    map.put("ERROR", String.format(failed.getFormat(), failed.getArgs()));
-                } else {
-                    if (te.getMessage() != null && !te.getMessage().equals("")) {
-                        map.put("ERROR", te.getMessage());
-                    } else {
-                        map.put("ERROR", te.getClass().getName());
-                    }
-                    List<String> trace = new ArrayList<>(te.getStackTrace().length);
-                    for (StackTraceElement ste : te.getStackTrace()) {
-                        trace.add(ste.getFileName() + ":" + ste.getLineNumber() + " " + ste.getMethodName());
-                    }
-                    map.put("stacktrace", trace);
-                    req.response().setStatusCode(500);
-                    te.printStackTrace();
+                List<String> trace = new ArrayList<>(te.getStackTrace().length);
+                for (StackTraceElement ste : te.getStackTrace()) {
+                    trace.add(ste.getFileName() + ":" + ste.getLineNumber() + " " + ste.getMethodName());
                 }
-                req.response().end(OUtils.toJson(map));
+                map.put("stacktrace", trace);
+                req.response().setStatusCode(500);
+                te.printStackTrace();
             }
-        } else {
-            try {
-                apiPair.getMethod().invoke(apiPair.getBean(), invokeArgs);
-            } catch (IllegalAccessException | IllegalArgumentException e) {
-
-            } catch (InvocationTargetException e) {
-
-            }
+            req.response().end(OUtils.toJson(map));
         }
     }
 }
