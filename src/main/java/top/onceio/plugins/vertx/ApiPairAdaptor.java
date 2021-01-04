@@ -9,6 +9,7 @@ import io.vertx.ext.web.Cookie;
 import io.vertx.ext.web.RoutingContext;
 import top.onceio.core.OConfig;
 import top.onceio.core.annotation.Validate;
+import top.onceio.core.beans.ApiMethod;
 import top.onceio.core.beans.ApiPair;
 import top.onceio.core.db.annotation.Model;
 import top.onceio.core.db.dao.DaoHolder;
@@ -146,8 +147,13 @@ public class ApiPairAdaptor {
                     Type t = DaoHolder.class.getTypeParameters()[0];
                     Class<?> tblClass = OReflectUtil.searchGenType(DaoHolder.class, apiPair.getBean().getClass(), t);
                     if (BaseMeta.class.isAssignableFrom(type) && args[entry.getKey()] == null) {
-                        BaseMeta cnd = AccessHelper.createFindBaseMeta(tblClass, json.getMap());
-                        args[entry.getKey()] = cnd;
+                        if (apiPair.getApiMethod().equals(ApiMethod.GET)) {
+                            BaseMeta cnd = AccessHelper.createFindBaseMeta(tblClass, json.getMap());
+                            args[entry.getKey()] = cnd;
+                        } else if (apiPair.getApiMethod().equals(ApiMethod.DELETE)) {
+                            BaseMeta cnd = AccessHelper.createDeleteBaseMeta(tblClass, json.getMap());
+                            args[entry.getKey()] = cnd;
+                        }
                     } else if (entry.getValue().equals("$page")) {
                         Object page = trans(json, "$page", Integer.TYPE);
                         args[entry.getKey()] = (page != null ? page : 1);
