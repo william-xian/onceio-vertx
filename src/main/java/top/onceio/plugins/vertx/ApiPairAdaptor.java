@@ -101,15 +101,16 @@ public class ApiPairAdaptor {
             json = new JsonObject();
         }
         MultiMap map = event.queryParams();
+        JsonObject queryJson = new JsonObject();
         for (Map.Entry<String, String> entry : map.entries()) {
             String val = entry.getValue();
             String name = entry.getKey();
             String[] ps = name.split("\\.");
             String pname = name;
-            JsonObject jobj = json;
+            JsonObject jobj = queryJson;
             if (ps.length > 0) {
                 pname = ps[ps.length - 1];
-                jobj = getOrCreateFatherByPath(json, ps);
+                jobj = getOrCreateFatherByPath(queryJson, ps);
             }
 
             Object jval = jobj.getValue(pname);
@@ -125,6 +126,9 @@ public class ApiPairAdaptor {
                     jobj.put(pname, ja);
                 }
             }
+        }
+        for (String name : queryJson.fieldNames()) {
+            json.put(name, queryJson.getValue(name));
         }
         String uri = event.normalisedPath();
         try {
