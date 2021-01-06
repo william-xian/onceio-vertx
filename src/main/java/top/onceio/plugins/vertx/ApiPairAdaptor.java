@@ -9,7 +9,7 @@ import io.vertx.ext.web.Cookie;
 import io.vertx.ext.web.RoutingContext;
 import top.onceio.core.OConfig;
 import top.onceio.core.annotation.Validate;
-import top.onceio.core.beans.ApiMethod;
+import top.onceio.core.beans.HttpMethod;
 import top.onceio.core.beans.ApiPair;
 import top.onceio.core.db.annotation.Model;
 import top.onceio.core.db.dao.DaoHolder;
@@ -151,10 +151,10 @@ public class ApiPairAdaptor {
                     Type t = DaoHolder.class.getTypeParameters()[0];
                     Class<?> tblClass = OReflectUtil.searchGenType(DaoHolder.class, apiPair.getBean().getClass(), t);
                     if (BaseMeta.class.isAssignableFrom(type) && args[entry.getKey()] == null) {
-                        if (apiPair.getApiMethod().equals(ApiMethod.GET)) {
+                        if (apiPair.getHttpMethod().equals(HttpMethod.GET)) {
                             BaseMeta cnd = AccessHelper.createFindBaseMeta(tblClass, json.getMap());
                             args[entry.getKey()] = cnd;
-                        } else if (apiPair.getApiMethod().equals(ApiMethod.DELETE)) {
+                        } else if (apiPair.getHttpMethod().equals(HttpMethod.DELETE)) {
                             BaseMeta cnd = AccessHelper.createDeleteBaseMeta(tblClass, json.getMap());
                             args[entry.getKey()] = cnd;
                         }
@@ -305,24 +305,15 @@ public class ApiPairAdaptor {
         }
         HttpServerRequest req = event.request();
         MultiMap headers = req.response().headers();
-
-        headers.set("Content-Type", "application/json; charset=UTF-8");
-        String origin = req.getHeader("Origin");
-        if (origin != null) {
-            headers.set("Access-Control-Allow-Origin", origin);
-        }
-        headers.set("Access-Control-Allow-Credentials", "true");
-        headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, TRACE");
-        headers.set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Cookie, userId, accessToken");
-
         Class<?> returnType = apiPair.getMethod().getReturnType();
         try {
             obj = apiPair.getMethod().invoke(apiPair.getBean(), args);
             if (!returnType.equals(void.class) && !returnType.equals(Void.class) && obj != null) {
                 String s = Json.encode(obj);
+                headers.set("Content-Type", "application/json; charset=UTF-8");
                 req.response().end(s);
-            } else {
-                req.response().end("{}");
+            } else if (!req.response().ended()) {
+                req.response().end();
             }
         } catch (IllegalAccessException | IllegalArgumentException e) {
             req.response().end(e.getMessage());
