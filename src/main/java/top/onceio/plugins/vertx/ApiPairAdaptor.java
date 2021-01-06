@@ -160,7 +160,7 @@ public class ApiPairAdaptor {
                         }
                     } else if (entry.getValue().equals("$page")) {
                         Object page = trans(json, "$page", Integer.TYPE);
-                        args[entry.getKey()] = (page != null ? page : 1);
+                        args[entry.getKey()] = (page != null ? page : 0);
                     } else if (entry.getValue().equals("$pageSize")) {
                         Object pageSize = trans(json, "$pageSize", Integer.TYPE);
                         args[entry.getKey()] = (pageSize != null ? pageSize : OConfig.PAGE_SIZE_DEFAULT);
@@ -168,17 +168,6 @@ public class ApiPairAdaptor {
                         Type ID = BaseModel.class.getTypeParameters()[0];
                         Class<?> idClass = OReflectUtil.searchGenType(BaseModel.class, tblClass, ID);
                         args[entry.getKey()] = trans(json, entry.getValue(), idClass);
-                    } else if (entry.getValue().equals("ids")) {
-                        Type ID = BaseModel.class.getTypeParameters()[0];
-                        Class<?> idClass = OReflectUtil.searchGenType(BaseModel.class, tblClass, ID);
-                        String idsString = json.getString(entry.getValue());
-                        String[] idArray = idsString.split(",");
-                        List<Object> ids = new ArrayList<>(idArray.length);
-                        for (String id : idArray) {
-                            Object idObj = trans(id, idClass);
-                            ids.add(idObj);
-                        }
-                        args[entry.getKey()] = ids;
                     } else if (!entry.getValue().equals("")) {
                         args[entry.getKey()] = trans(json, entry.getValue(), type);
                     } else {
