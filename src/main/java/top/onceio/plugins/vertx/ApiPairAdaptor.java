@@ -8,7 +8,6 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Cookie;
 import io.vertx.ext.web.RoutingContext;
 import top.onceio.core.OConfig;
-import top.onceio.core.annotation.Validate;
 import top.onceio.core.beans.HttpMethod;
 import top.onceio.core.beans.ApiPair;
 import top.onceio.core.db.annotation.Model;
@@ -17,6 +16,7 @@ import top.onceio.core.db.model.AccessHelper;
 import top.onceio.core.db.model.BaseMeta;
 import top.onceio.core.db.model.BaseModel;
 import top.onceio.core.exception.Failed;
+import top.onceio.core.mvc.annocations.Param;
 import top.onceio.core.util.OReflectUtil;
 import top.onceio.core.util.OUtils;
 
@@ -209,10 +209,10 @@ public class ApiPairAdaptor {
             }
         }
         //TODO 表单验证
-        Validate[] validates = new Validate[types.length];
+        Param[] validates = new Param[types.length];
         Model[] models = new Model[types.length];
         for (int i = 0; i < validates.length; i++) {
-            validates[i] = apiPair.getMethod().getParameters()[i].getAnnotation(Validate.class);
+            validates[i] = apiPair.getMethod().getParameters()[i].getAnnotation(Param.class);
             models[i] = types[i].getAnnotation(Model.class);
         }
 
