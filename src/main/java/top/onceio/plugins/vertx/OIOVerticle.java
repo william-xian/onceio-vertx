@@ -2,6 +2,7 @@ package top.onceio.plugins.vertx;
 
 import java.util.*;
 
+import com.google.gson.JsonElement;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
@@ -14,9 +15,9 @@ import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.CookieHandler;
 import io.vertx.ext.web.handler.sockjs.SockJSHandler;
 import io.vertx.ext.web.impl.RouterImpl;
-import top.onceio.core.annotation.BeansIn;
+import top.onceio.core.annotation.BeanScan;
 import top.onceio.core.beans.ApiPair;
-import top.onceio.core.beans.ApiResover;
+import top.onceio.core.beans.ApiResolver;
 import top.onceio.core.beans.BeansEden;
 import top.onceio.plugins.vertx.annotation.AsSock;
 import top.onceio.plugins.vertx.annotation.AsWebsocket;
@@ -35,17 +36,16 @@ public class OIOVerticle extends AbstractVerticle {
         BeansEden.get().store(EventBus.class, null, eb);
         BeansEden.get().store(Vertx.class, null, vertx);
 
-        BeansIn pkgConf = this.getClass().getAnnotation(BeansIn.class);
+        BeanScan pkgConf = this.getClass().getAnnotation(BeanScan.class);
         List<String> confDir = new ArrayList<>();
         String[] pkgs = null;
         if (pkgConf != null) {
             pkgs = pkgConf.value();
-            confDir.addAll(Arrays.asList(pkgConf.conf()));
         } else {
             String pkg = this.getClass().getName();
             pkgs = new String[]{pkg.substring(0, pkg.lastIndexOf('.'))};
-            confDir.add("conf");
         }
+        confDir.add("");
         String confDef = System.getProperty("conf");
         if (confDef != null) {
             confDir.add(confDef);
@@ -60,7 +60,7 @@ public class OIOVerticle extends AbstractVerticle {
         router.exceptionHandler(e -> {
             e.printStackTrace();
         });
-        ApiResover ar = BeansEden.get().getApiResolver();
+        ApiResolver ar = BeansEden.get().getApiResolver();
         Map<String, ApiPair> p2ap = ar.getPatternToApi();
         List<String> lst = new ArrayList<>(p2ap.keySet());
         /**使得正则排序在后面，保证/get/byIds优先于/get/{id}匹配 */
@@ -100,7 +100,13 @@ public class OIOVerticle extends AbstractVerticle {
     }
 
     protected void startServer() {
-        int port = this.config().getInteger("port", 1230);
+        JsonElement element = BeansEden.get().loader.getConf().get("port");
+        int port = 1230;
+        if (!element.isJsonNull()) {
+            port = element.getAsInt();
+        } else {
+            port = this.config().getInteger("port", 1230);
+        }
         Set<Class<?>> websockets = BeansEden.get().getClassByAnnotation(AsWebsocket.class);
         if (!websockets.isEmpty()) {
             Class<?> wsh = websockets.iterator().next();

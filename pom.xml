@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>top.onceio</groupId>
 	<artifactId>onceio-vertx</artifactId>
-	<version>0.0.7</version>
+	<version>0.1.1</version>
 	<name>onceio-vertx</name>
 	<description>onceio is an easy to using and learnning ORM framework.</description>
 	<url>http://www.onceio.top/</url>
