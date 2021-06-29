@@ -39,7 +39,7 @@ public class OIOVerticle extends AbstractVerticle {
         BeanScan pkgConf = this.getClass().getAnnotation(BeanScan.class);
         List<String> confDir = new ArrayList<>();
         String[] pkgs = null;
-        if (pkgConf != null) {
+        if (pkgConf != null && pkgConf.value() != null && pkgConf.value().length != 0) {
             pkgs = pkgConf.value();
         } else {
             String pkg = this.getClass().getName();
@@ -102,10 +102,8 @@ public class OIOVerticle extends AbstractVerticle {
     protected void startServer() {
         JsonElement element = BeansEden.get().loader.getConf().get("port");
         int port = 1230;
-        if (!element.isJsonNull()) {
+        if (element != null && !element.isJsonNull()) {
             port = element.getAsInt();
-        } else {
-            port = this.config().getInteger("port", 1230);
         }
         Set<Class<?>> websockets = BeansEden.get().getClassByAnnotation(AsWebsocket.class);
         if (!websockets.isEmpty()) {
