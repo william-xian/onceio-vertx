@@ -53,30 +53,6 @@ public class ApiPairAdaptor {
         return jobj;
     }
 
-    private Object[] detectInvokeArgs(final RoutingContext event) {
-        Map<Class<?>, Integer> typeIndex = apiPair.getTypeIndex();
-        Method method = apiPair.getMethod();
-        Object[] args = new Object[method.getParameterCount()];
-        if (typeIndex != null && !typeIndex.isEmpty()) {
-            boolean has = false;
-            for (Entry<Class<?>, Integer> entry : typeIndex.entrySet()) {
-                Class<?> cls = entry.getKey();
-                Integer i = entry.getValue();
-                if (RoutingContext.class.isAssignableFrom(cls)) {
-                    args[i] = event;
-                    has = true;
-                } else if (HttpServerRequest.class.isAssignableFrom(cls)) {
-                    args[i] = event.request();
-                    has = true;
-                }
-            }
-            if (has) {
-                return args;
-            }
-        }
-        return null;
-    }
-
     /**
      * 根据方法参数及其注解，从req（Attr,Param,Body,Cookie)中取出数据 TODO Header
      *
@@ -147,6 +123,13 @@ public class ApiPairAdaptor {
         if (paramNameArgIndex != null && !paramNameArgIndex.isEmpty()) {
             for (Map.Entry<Integer, String> entry : paramNameArgIndex.entrySet()) {
                 Class<?> type = types[entry.getKey()];
+                if (RoutingContext.class.isAssignableFrom(type)) {
+                    args[entry.getKey()] = event;
+                    continue;
+                } else if (HttpServerRequest.class.isAssignableFrom(type)) {
+                    args[entry.getKey()] = event.request();
+                    continue;
+                }
                 if (DaoHolder.class.isAssignableFrom(apiPair.getBean().getClass())) {
                     Type t = DaoHolder.class.getTypeParameters()[0];
                     Class<?> tblClass = OReflectUtil.searchGenType(DaoHolder.class, apiPair.getBean().getClass(), t);
@@ -299,10 +282,7 @@ public class ApiPairAdaptor {
 
     public void invoke(RoutingContext event) {
         Object obj = null;
-        Object[] args = detectInvokeArgs(event);
-        if (args == null) {
-            args = resolveArgs(event);
-        }
+        Object[] args = resolveArgs(event);
         HttpServerRequest req = event.request();
         MultiMap headers = req.response().headers();
         Class<?> returnType = apiPair.getMethod().getReturnType();
@@ -316,18 +296,21 @@ public class ApiPairAdaptor {
                 req.response().end();
             }
         } catch (IllegalAccessException | IllegalArgumentException e) {
+            e.printStackTrace();
             req.response().end(e.getMessage());
         } catch (InvocationTargetException e) {
             headers.set("Content-Type", "application/json; charset=UTF-8");
             Map<String, Object> map = new HashMap<>();
             Throwable te = e.getTargetException();
+            te.printStackTrace();
             if (te instanceof Failed) {
                 Failed failed = (Failed) te;
                 map.put("data", failed.getData());
                 map.put("args", failed.getArgs());
                 map.put("format", failed.getFormat());
-                map.put("message", String.format(failed.getFormat(), failed.getArgs()));
-                req.response().setStatusCode(failed.getCode()).setStatusMessage(map.get("message").toString()).end(OUtils.toJson(map));
+                String message = String.format(failed.getFormat(), failed.getArgs()).replace("\n"," ");
+                map.put("message", message);
+                req.response().setStatusCode(failed.getCode()).setStatusMessage(message).end(OUtils.toJson(map));
             } else {
                 if (te.getMessage() != null && !te.getMessage().equals("")) {
                     map.put("message", te.getMessage());
@@ -340,7 +323,6 @@ public class ApiPairAdaptor {
                 }
                 map.put("stacktrace", trace);
                 req.response().setStatusCode(500).setStatusMessage(map.get("message").toString()).end(OUtils.toJson(map));
-                te.printStackTrace();
             }
         }
     }
