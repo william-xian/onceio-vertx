@@ -120,16 +120,17 @@ public class ApiPairAdaptor {
         }
         Class<?>[] types = apiPair.getMethod().getParameterTypes();
 
+        for(int i = 0; i < types.length; i++) {
+            Class<?> type = types[i];
+            if (RoutingContext.class.isAssignableFrom(type)) {
+                args[i] = event;
+            } else if (HttpServerRequest.class.isAssignableFrom(type)) {
+                args[i] = event.request();
+            }
+        }
         if (paramNameArgIndex != null && !paramNameArgIndex.isEmpty()) {
             for (Map.Entry<Integer, String> entry : paramNameArgIndex.entrySet()) {
                 Class<?> type = types[entry.getKey()];
-                if (RoutingContext.class.isAssignableFrom(type)) {
-                    args[entry.getKey()] = event;
-                    continue;
-                } else if (HttpServerRequest.class.isAssignableFrom(type)) {
-                    args[entry.getKey()] = event.request();
-                    continue;
-                }
                 if (DaoHolder.class.isAssignableFrom(apiPair.getBean().getClass())) {
                     Type t = DaoHolder.class.getTypeParameters()[0];
                     Class<?> tblClass = OReflectUtil.searchGenType(DaoHolder.class, apiPair.getBean().getClass(), t);
