@@ -253,7 +253,7 @@ public class ApiPairAdaptor {
             if (!"".equals(key)) {
                 Object val = obj.getValue(key);
                 if (val == null) {
-                    return val;
+                    return null;
                 } else {
                     Class<?> valType = val.getClass();
                     if (valType.equals(type)) {
