@@ -318,6 +318,7 @@ public class ApiPairAdaptor {
         } catch (IllegalAccessException | IllegalArgumentException e) {
             req.response().end(e.getMessage());
         } catch (InvocationTargetException e) {
+            headers.set("Content-Type", "application/json; charset=UTF-8");
             Map<String, Object> map = new HashMap<>();
             Throwable te = e.getTargetException();
             if (te instanceof Failed) {
@@ -325,22 +326,22 @@ public class ApiPairAdaptor {
                 map.put("data", failed.getData());
                 map.put("args", failed.getArgs());
                 map.put("format", failed.getFormat());
-                map.put("ERROR", String.format(failed.getFormat(), failed.getArgs()));
+                map.put("message", String.format(failed.getFormat(), failed.getArgs()));
+                req.response().setStatusCode(failed.getCode()).setStatusMessage(map.get("message").toString()).end(OUtils.toJson(map));
             } else {
                 if (te.getMessage() != null && !te.getMessage().equals("")) {
-                    map.put("ERROR", te.getMessage());
+                    map.put("message", te.getMessage());
                 } else {
-                    map.put("ERROR", te.getClass().getName());
+                    map.put("message", te.getClass().getName());
                 }
                 List<String> trace = new ArrayList<>(te.getStackTrace().length);
                 for (StackTraceElement ste : te.getStackTrace()) {
                     trace.add(ste.getFileName() + ":" + ste.getLineNumber() + " " + ste.getMethodName());
                 }
                 map.put("stacktrace", trace);
-                req.response().setStatusCode(500);
+                req.response().setStatusCode(500).setStatusMessage(map.get("message").toString()).end(OUtils.toJson(map));
                 te.printStackTrace();
             }
-            req.response().end(OUtils.toJson(map));
         }
     }
 }
