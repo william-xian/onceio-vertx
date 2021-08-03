@@ -119,15 +119,6 @@ public class ApiPairAdaptor {
             json.put(name, v);
         }
         Class<?>[] types = apiPair.getMethod().getParameterTypes();
-
-        for(int i = 0; i < types.length; i++) {
-            Class<?> type = types[i];
-            if (RoutingContext.class.isAssignableFrom(type)) {
-                args[i] = event;
-            } else if (HttpServerRequest.class.isAssignableFrom(type)) {
-                args[i] = event.request();
-            }
-        }
         if (paramNameArgIndex != null && !paramNameArgIndex.isEmpty()) {
             for (Map.Entry<Integer, String> entry : paramNameArgIndex.entrySet()) {
                 Class<?> type = types[entry.getKey()];
@@ -161,15 +152,21 @@ public class ApiPairAdaptor {
                     args[entry.getKey()] = trans(json, entry.getValue(), type);
                 }
             }
-
-            if (typeIndex != null && !typeIndex.isEmpty()) {
-                for (Entry<Class<?>, Integer> entry : typeIndex.entrySet()) {
-                    Class<?> cls = entry.getKey();
-                    Integer i = entry.getValue();
+        }
+        if (typeIndex != null && !typeIndex.isEmpty()) {
+            for (Entry<Class<?>, Integer> entry : typeIndex.entrySet()) {
+                Class<?> cls = entry.getKey();
+                Integer i = entry.getValue();
+                if (RoutingContext.class.isAssignableFrom(cls)) {
+                    args[i] = event;
+                } else if (HttpServerRequest.class.isAssignableFrom(cls)) {
+                    args[i] = event.request();
+                } else {
                     args[i] = json.mapTo(cls);
                 }
             }
         }
+
         if (cookieNameArgIndex != null && !cookieNameArgIndex.isEmpty()) {
             for (Map.Entry<Integer, String> entry : cookieNameArgIndex.entrySet()) {
                 Cookie cookie = event.getCookie(entry.getValue());
@@ -309,7 +306,7 @@ public class ApiPairAdaptor {
                 map.put("data", failed.getData());
                 map.put("args", failed.getArgs());
                 map.put("format", failed.getFormat());
-                String message = String.format(failed.getFormat(), failed.getArgs()).replace("\n"," ");
+                String message = String.format(failed.getFormat(), failed.getArgs()).replace("\n", " ");
                 map.put("message", message);
                 req.response().setStatusCode(failed.getCode()).setStatusMessage(message).end(OUtils.toJson(map));
             } else {
