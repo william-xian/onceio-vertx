@@ -45,10 +45,11 @@ public class OIOVerticle extends AbstractVerticle {
             String pkg = this.getClass().getName();
             pkgs = new String[]{pkg.substring(0, pkg.lastIndexOf('.'))};
         }
-        confDir.add("");
         String confDef = System.getProperty("conf");
         if (confDef != null) {
             confDir.add(confDef);
+        } else {
+            confDir.add(".");
         }
         BeansEden.get().addAnnotation(AsSock.class, AsWebsocket.class);
         BeansEden.get().resolve(confDir.toArray(new String[0]), pkgs);
