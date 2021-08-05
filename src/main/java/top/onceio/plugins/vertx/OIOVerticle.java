@@ -49,7 +49,7 @@ public class OIOVerticle extends AbstractVerticle {
         if (confDef != null) {
             confDir.add(confDef);
         } else {
-            confDir.add("./conf.json");
+            confDir.add("conf.json");
         }
         BeansEden.get().addAnnotation(AsSock.class, AsWebsocket.class);
         BeansEden.get().resolve(confDir.toArray(new String[0]), pkgs);
