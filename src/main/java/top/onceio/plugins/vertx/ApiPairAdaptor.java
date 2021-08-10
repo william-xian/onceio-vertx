@@ -280,7 +280,12 @@ public class ApiPairAdaptor {
 
     public void invoke(RoutingContext event) {
         Object obj = null;
-        Object[] args = resolveArgs(event);
+        Object[] args = null;
+        try {
+            args = resolveArgs(event);
+        } catch (Exception e) {
+            Failed.fail("%s:%s 解析异常: %s", apiPair.getBean().getClass().getName(), apiPair.getMethod().getName(), e.getMessage());
+        }
         HttpServerRequest req = event.request();
         MultiMap headers = req.response().headers();
         Class<?> returnType = apiPair.getMethod().getReturnType();
